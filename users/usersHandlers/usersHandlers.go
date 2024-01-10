@@ -2,7 +2,6 @@ package usersHandlers
 
 import (
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pok92deng/config"
@@ -81,7 +80,6 @@ func (h *usersHandler) SignUpCustomer(c *gin.Context) {
 
 func (h *usersHandler) SignIn(c *gin.Context) {
 	var req users.UserCredential
-	fmt.Println("reqSignIn", req)
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -117,7 +115,6 @@ func (h *usersHandler) RefreshPassport(c *gin.Context) {
 
 	passport, err := h.usersUsecase.RefreshPassport(req)
 	if err != nil {
-		// You might want to log the error here
 		h.respondWithError(c, http.StatusBadRequest, "Error refreshing passport: "+err.Error())
 		return
 	}

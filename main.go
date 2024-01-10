@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"os"
 	"pok92deng/config"
@@ -23,20 +22,24 @@ func main() {
 	cfg := config.LoadConfig(envPath())
 	fmt.Println(cfg.Db())
 
-	mongoClient, usersCollection, productsCollection, signinsCollection, err := databases.ConnectMongoDB(cfg.Db())
-
+	mongoDatabase, err := databases.ConnectMongoDB(cfg.Db())
 	if err != nil {
 		panic(err)
 	}
-	defer func(mongoClient *mongo.Client, ctx context.Context) {
-		err := mongoClient.Disconnect(ctx)
-		if err != nil {
 
+	// Assuming the mongoDatabase object has a method to return the client
+	mongoClient := mongoDatabase.Client()
+
+	defer func() {
+		err := mongoClient.Disconnect(context.Background())
+		if err != nil {
+			log.Printf("Failed to disconnect from MongoDB: %v", err)
 		}
-	}(mongoClient, nil)
+	}()
+
 	ctx := context.Background()
 
-	server := servers.NewServer(cfg, mongoClient, usersCollection, productsCollection, signinsCollection)
+	server := servers.NewServer(cfg, mongoDatabase)
 	if err := server.Start(ctx); err != nil { // Pass the created context
 		log.Fatalf("Failed to start server: %v", err)
 	}

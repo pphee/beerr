@@ -1,7 +1,6 @@
 package middlewaresHandler
 
 import (
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"net/http"
 	"pok92deng/config"
@@ -14,7 +13,6 @@ import (
 )
 
 type IMiddlewaresHandler interface {
-	Cors() gin.HandlerFunc
 	JwtAuth() gin.HandlerFunc
 	ParamCheck() gin.HandlerFunc
 	Authorize(expectRoleId ...int) gin.HandlerFunc
@@ -33,15 +31,6 @@ func MiddlewaresRepository(cfg config.IConfig, middlewaresUsecase middlewaresUse
 	}
 }
 
-func (h *middlewaresHandler) Cors() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET,POST,HEAD,PUT,DELETE,PATCH")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "")
-		c.Next()
-	}
-}
-
 func (h *middlewaresHandler) JwtAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
@@ -53,7 +42,7 @@ func (h *middlewaresHandler) JwtAuth() gin.HandlerFunc {
 			return
 		}
 		claims := result.Claims
-		fmt.Println("claims", claims)
+
 		if !h.middlewaresUsecase.FindAccessToken(claims.Id.Hex(), token) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "no permission to access",
@@ -115,7 +104,7 @@ func (h *middlewaresHandler) ParamCheck() gin.HandlerFunc {
 func (h *middlewaresHandler) Authorize(expectRoleId ...int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRoleId, exists := c.Get("userRoleId")
-		fmt.Println("userRoleId", userRoleId)
+
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "userRoleId not found",

@@ -3,6 +3,7 @@ package servers
 import (
 	"context"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
@@ -14,37 +15,40 @@ type IServer interface {
 }
 
 type server struct {
-	app                *gin.Engine
-	mongoClient        *mongo.Client
-	usersCollection    *mongo.Collection
-	productsCollection *mongo.Collection
-	signsinCollection  *mongo.Collection
-	cfg                config.IConfig
+	app           *gin.Engine
+	mongoDatabase *mongo.Database
+	cfg           config.IConfig
 }
 
-func NewServer(cfg config.IConfig, mongoClient *mongo.Client, usersCollection *mongo.Collection, productsCollection *mongo.Collection, signsinCollection *mongo.Collection) IServer {
+func NewServer(cfg config.IConfig, mongoDatabase *mongo.Database) IServer {
 	gin.SetMode(gin.ReleaseMode)
 
-	r := gin.New()
+	r := gin.Default()
 	r.Use(gin.Logger())
 
 	return &server{
-		app:                r,
-		cfg:                cfg,
-		mongoClient:        mongoClient,
-		usersCollection:    usersCollection,
-		productsCollection: productsCollection,
-		signsinCollection:  signsinCollection,
+		app:           r,
+		cfg:           cfg,
+		mongoDatabase: mongoDatabase,
 	}
 }
 
 func (s *server) Start(ctx context.Context) error {
 	middlewares := InitMiddlewares(s)
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowCredentials = true
+	config.AddAllowHeaders("Authorization", "access-control-allow-origin")
+	s.app.Use(cors.New(config))
+	//s.app.Use(middlewares.Cors())
 	api := s.app.Group("/api")
 	modules := InitModule(api, s, middlewares)
 	modules.UsersModule()
+	modules.ProductsModule()
+	s.app.Static("/uploads/beers", "./uploads/beers")
+	mongoClient := s.mongoDatabase.Client()
 
-	if err := s.mongoClient.Ping(ctx, nil); err != nil {
+	if err := mongoClient.Ping(ctx, nil); err != nil {
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 

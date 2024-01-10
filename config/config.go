@@ -32,7 +32,7 @@ func LoadConfig(path string) IConfig {
 			mongodbname:        envMap["MONGODB_DB_NAME"],
 			userscollection:    envMap["USERS_COLLECTION"],
 			productscollection: envMap["PRODUCTS_COLLECTION"],
-			signinscollection:  envMap["SIGNINS_COLLECTION"],
+			signinscollection:  envMap["USERS_SIGNIN_COLLECTION"],
 		},
 		jwt: &jwt{
 			adminKey:         envMap["JWT_ADMIN_KEY"],

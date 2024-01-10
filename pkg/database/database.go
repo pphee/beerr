@@ -8,21 +8,18 @@ import (
 	"pok92deng/config"
 )
 
-func ConnectMongoDB(cfg config.IDbConfig) (*mongo.Client, *mongo.Collection, *mongo.Collection, *mongo.Collection, error) {
+func ConnectMongoDB(cfg config.IDbConfig) (*mongo.Database, error) {
 	clientOptions := options.Client().ApplyURI(cfg.Url())
 	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
+		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
 	err = client.Ping(context.Background(), nil)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to ping MongoDB: %w", err)
+		return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 
 	db := client.Database(cfg.Name())
-	userscollection := db.Collection(cfg.UsersCollection())
-	signinscollection := db.Collection(cfg.SigninsCollection())
-	productscollection := db.Collection(cfg.ProductsCollection())
-	return client, userscollection, productscollection, signinscollection, nil
+	return db, nil
 }

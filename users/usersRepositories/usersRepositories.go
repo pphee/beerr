@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"pok92deng/config"
 	"pok92deng/users"
 	"pok92deng/users/usersPatterns"
 	"time"
@@ -22,48 +23,35 @@ type UserRepository interface {
 }
 
 type usersRepository struct {
-	db *mongo.Collection
+	db  *mongo.Database
+	cfg config.IConfig
 }
 
-func UsersRepository(collection *mongo.Collection) UserRepository {
+func UsersRepository(cfg config.IConfig, mongoDatabase *mongo.Database) UserRepository {
 	return &usersRepository{
-		db: collection,
+		cfg: cfg,
+		db:  mongoDatabase,
 	}
 }
 
 func (r *usersRepository) InsertUser(req *users.UserRegisterReq, isAdmin bool) (*users.UserPassport, error) {
-	existingUserByEmail, err := r.FindOneUserByEmail(req.Email)
-	if err != nil && err.Error() != "user not found" {
-		return nil, fmt.Errorf("error checking for existing user by email: %v", err)
-	}
-	if existingUserByEmail != nil {
-		return nil, users.NewHTTPError(409, "a user with the same email already exists")
+	if err := r.checkUserExistence(req.Email, req.Username); err != nil {
+		return nil, err
 	}
 
-	existingUserByUsername, err := r.FindOneUserByUsername(req.Username)
-	if err != nil && err.Error() != "user not found" {
-		return nil, fmt.Errorf("error checking for existing user by username: %v", err)
-	}
-	if existingUserByUsername != nil {
-		return nil, users.NewHTTPError(409, "a user with the same username already exists")
-	}
+	result := usersPatterns.InsertUser(r.db.Collection(r.cfg.Db().UsersCollection()), req, isAdmin)
 
-	result := usersPatterns.InsertUser(r.db, req, isAdmin)
-
+	var err error
 	if isAdmin {
 		result, err = result.Admin()
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		result, err = result.Customer()
-		if err != nil {
-			return nil, err
-		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	user, err := result.Result()
-
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +59,26 @@ func (r *usersRepository) InsertUser(req *users.UserRegisterReq, isAdmin bool) (
 	return user, nil
 }
 
+func (r *usersRepository) checkUserExistence(email, username string) error {
+	if user, err := r.FindOneUserByEmail(email); err != nil && err.Error() != "user not found" {
+		return fmt.Errorf("error checking for existing user by email: %v", err)
+	} else if user != nil {
+		return users.NewHTTPError(409, "a user with the same email already exists")
+	}
+
+	if user, err := r.FindOneUserByUsername(username); err != nil && err.Error() != "user not found" {
+		return fmt.Errorf("error checking for existing user by username: %v", err)
+	} else if user != nil {
+		return users.NewHTTPError(409, "a user with the same username already exists")
+	}
+
+	return nil
+}
+
 func (r *usersRepository) FindOneUser(filter bson.M) (*users.UserCredentialCheck, error) {
 	var user users.UserCredentialCheck
 
-	err := r.db.FindOne(context.TODO(), filter).Decode(&user)
+	err := r.db.Collection(r.cfg.Db().UsersCollection()).FindOne(context.TODO(), filter).Decode(&user)
 	if err != nil {
 		if errors.Is(mongo.ErrNoDocuments, err) {
 			return nil, fmt.Errorf("user not found")
@@ -107,7 +111,7 @@ func (r *usersRepository) InsertOauth(req *users.UserPassport) error {
 		"updated_at":    time.Now(),
 	}
 
-	result, err := r.db.InsertOne(ctx, oauthDocument)
+	result, err := r.db.Collection(r.cfg.Db().SigninsCollection()).InsertOne(ctx, oauthDocument)
 	if err != nil {
 		return fmt.Errorf("insert oauth failed: %v", err)
 	}
@@ -131,7 +135,7 @@ func (r *usersRepository) FindOneOauth(refreshToken string) (*users.Oauth, error
 	var mongoPassport users.MongoPassport
 	filter := bson.M{"refresh_token": refreshToken}
 
-	err := r.db.FindOne(ctx, filter).Decode(&mongoPassport)
+	err := r.db.Collection(r.cfg.Db().SigninsCollection()).FindOne(ctx, filter).Decode(&mongoPassport)
 	if err != nil {
 		fmt.Println("Error:", err)
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -170,8 +174,8 @@ func (r *usersRepository) GetProfile(userId string) (*users.User, error) {
 	}
 
 	filter := bson.M{"_id": objID}
-	fmt.Println("filter", filter)
-	if err := r.db.FindOne(ctx, filter).Decode(&profile); err != nil {
+
+	if err := r.db.Collection(r.cfg.Db().UsersCollection()).FindOne(ctx, filter).Decode(&profile); err != nil {
 		if errors.Is(mongo.ErrNoDocuments, err) {
 			return nil, fmt.Errorf("get user failed: user not found")
 		}
@@ -199,7 +203,7 @@ func (r *usersRepository) UpdateOauth(req *users.UserToken) error {
 		},
 	}
 
-	result, err := r.db.UpdateOne(ctx, filter, update)
+	result, err := r.db.Collection(r.cfg.Db().SigninsCollection()).UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("update oauth failed: %v", err)
 	}

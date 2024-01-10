@@ -6,6 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"pok92deng/config"
 	middlewares "pok92deng/middleware"
 )
 
@@ -15,12 +16,14 @@ type IMiddlewaresRepository interface {
 }
 
 type middlewaresRepository struct {
-	db *mongo.Collection
+	cfg config.IConfig
+	db  *mongo.Database
 }
 
-func MiddlewaresRepository(db *mongo.Collection) IMiddlewaresRepository {
+func MiddlewaresRepository(cfg config.IConfig, db *mongo.Database) IMiddlewaresRepository {
 	return &middlewaresRepository{
-		db: db,
+		cfg: cfg,
+		db:  db,
 	}
 }
 
@@ -33,7 +36,7 @@ func (r *middlewaresRepository) FindAccessToken(userId, accessToken string) bool
 
 	filter := bson.M{"user_id": objId, "access_token": accessToken}
 
-	count, err := r.db.CountDocuments(context.Background(), filter)
+	count, err := r.db.Collection(r.cfg.Db().SigninsCollection()).CountDocuments(context.Background(), filter)
 	if err != nil {
 		fmt.Println("Error counting documents:", err)
 		return false
@@ -43,7 +46,7 @@ func (r *middlewaresRepository) FindAccessToken(userId, accessToken string) bool
 }
 
 func (r *middlewaresRepository) FindRole() ([]*middlewares.Role, error) {
-	cursor, err := r.db.Find(context.Background(), bson.D{})
+	cursor, err := r.db.Collection(r.cfg.Db().SigninsCollection()).Find(context.Background(), bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("roles are empty")
 	}
