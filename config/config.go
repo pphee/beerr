@@ -4,13 +4,19 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"log"
+	"os"
 	"strconv"
 )
 
 func LoadConfig(path string) IConfig {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		log.Fatalf("Error: .env file not found at path: %s", path)
+	}
+
+	// Read the .env file
 	envMap, err := godotenv.Read(path)
 	if err != nil {
-		log.Fatalf("load dotenv failed: %v", err)
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	parseInt := func(key string) int {

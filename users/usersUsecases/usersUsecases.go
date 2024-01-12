@@ -58,27 +58,45 @@ func (u *usersUsecase) InsertAdmin(req *users.UserRegisterReq) (*users.UserPassp
 }
 
 func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPassport, error) {
-	//Find user
+	// Find user
 	user, err := u.userRepository.FindOneUserByEmail(req.Email)
 	if err != nil {
 		return nil, err
 	}
 
-	//Compare password
+	// Compare password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, fmt.Errorf("password is invalid")
 	}
-	//sign token
-	accessToken, err := auth.NewAuth(auth.Access, u.cfg.Jwt(), &users.UserClaims{
+
+	AdminRoleId := 2
+
+	var tokenType auth.TokenType
+	if user.RoleId == AdminRoleId {
+		tokenType = auth.Admin
+	} else {
+		tokenType = auth.Access
+	}
+
+	// Sign token based on the user role
+	token, err := auth.NewAuth(tokenType, u.cfg.Jwt(), &users.UserClaims{
 		Id:     user.Id,
 		RoleId: user.RoleId,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Sign refresh token
 	refreshToken, err := auth.NewAuth(auth.Refresh, u.cfg.Jwt(), &users.UserClaims{
 		Id:     user.Id,
 		RoleId: user.RoleId,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	//Set passport
+	// Set passport
 	passport := &users.UserPassport{
 		User: &users.User{
 			Id:       user.Id,
@@ -87,7 +105,7 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 			RoleId:   user.RoleId,
 		},
 		Token: &users.UserToken{
-			AccessToken:  accessToken.SignToken(),
+			AccessToken:  token.SignToken(), // This will be an admin token for admin users
 			RefreshToken: refreshToken.SignToken(),
 		},
 	}
@@ -95,11 +113,12 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 	if err := u.userRepository.InsertOauth(passport); err != nil {
 		return nil, err
 	}
+
 	return passport, nil
 }
 
 func (u *usersUsecase) RefreshPassport(req *users.UserRefreshCredential) (*users.UserPassport, error) {
-	claims, err := auth.ParseToken(u.cfg.Jwt(), req.RefreshToken)
+	claims, err := auth.ParseCustomerToken(u.cfg.Jwt(), req.RefreshToken)
 
 	if err != nil {
 		return nil, err

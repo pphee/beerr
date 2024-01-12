@@ -1,22 +1,20 @@
 package middlewaresHandler
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"pok92deng/config"
+	middlewares "pok92deng/middleware"
 	middlewaresUsecases "pok92deng/middleware/middlewareUsecases"
 	auth "pok92deng/pkg"
 	"pok92deng/utils"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
 type IMiddlewaresHandler interface {
-	JwtAuth() gin.HandlerFunc
+	JwtAuth(config middlewares.JwtAuthConfig) gin.HandlerFunc
 	ParamCheck() gin.HandlerFunc
 	Authorize(expectRoleId ...int) gin.HandlerFunc
-	JwtAuthAdmin() gin.HandlerFunc
 }
 
 type middlewaresHandler struct {
@@ -31,48 +29,6 @@ func MiddlewaresRepository(cfg config.IConfig, middlewaresUsecase middlewaresUse
 	}
 }
 
-func (h *middlewaresHandler) JwtAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-		result, err := auth.ParseToken(h.cfg.Jwt(), token)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-		claims := result.Claims
-
-		if !h.middlewaresUsecase.FindAccessToken(claims.Id.Hex(), token) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "no permission to access",
-			})
-			return
-		}
-
-		c.Set("userId", claims.Id)
-		c.Set("userRoleId", claims.RoleId)
-		c.Next()
-	}
-}
-
-func (h *middlewaresHandler) JwtAuthAdmin() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		tokenString := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-		parsedToken, err := auth.ParseAdminToken(h.cfg.Jwt(), tokenString)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.Set("parsedToken", parsedToken)
-
-		c.Next()
-	}
-}
-
 func (h *middlewaresHandler) ParamCheck() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId, exists := c.Get("userId")
@@ -83,15 +39,15 @@ func (h *middlewaresHandler) ParamCheck() gin.HandlerFunc {
 			return
 		}
 
-		userIdStr, ok := userId.(primitive.ObjectID)
+		userIdStr, ok := userId.(string)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "User ID is not of type ObjectID",
+				"error": "User ID is not of type string",
 			})
 			return
 		}
 
-		if c.Param("user_id") != userIdStr.Hex() {
+		if c.Param("user_id") != userIdStr {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "Parameter check failed",
 			})
@@ -143,4 +99,54 @@ func sumRoles(roles ...int) int {
 		sum += v
 	}
 	return sum
+}
+
+func (h *middlewaresHandler) JwtAuth(config middlewares.JwtAuthConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+
+		var userID string
+		var userRoleId int
+		var isCustomer bool
+
+		if config.AllowCustomer {
+			parsedToken, err := auth.ParseCustomerToken(h.cfg.Jwt(), tokenString)
+			if err == nil {
+				claims := parsedToken.Claims
+				userID = claims.Id.Hex() // Assuming claims.Id is a string representation of ObjectID
+				userRoleId = claims.RoleId
+				isCustomer = true
+				c.Set("userId", userID)
+				c.Set("userRoleId", userRoleId)
+
+				if !h.middlewaresUsecase.FindAccessToken(userID, tokenString) {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+						"error": "no permission to access",
+					})
+					return
+				}
+			}
+		}
+
+		if !isCustomer && config.AllowAdmin {
+			adminClaims, err := auth.ParseAdminToken(h.cfg.Jwt(), tokenString)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "admin token verification failed",
+				})
+				return
+			}
+			userID = adminClaims.Claims.Id.Hex() // Assuming claims.Id is a string representation of ObjectID
+			userRoleId = adminClaims.Claims.RoleId
+			c.Set("userId", userID)
+			c.Set("userRoleId", userRoleId)
+		} else if !isCustomer {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "token verification failed",
+			})
+			return
+		}
+
+		c.Next()
+	}
 }

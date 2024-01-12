@@ -1,7 +1,7 @@
 package servers
 
 import (
-	"github.com/gin-gonic/gin"
+	middlewares "pok92deng/middleware"
 	middlewaresHandler "pok92deng/middleware/middlewareHandlers"
 	middlewaresRepositories "pok92deng/middleware/middlewareRepositories"
 	middlewaresUsecases "pok92deng/middleware/middlewareUsecases"
@@ -11,10 +11,11 @@ import (
 	"pok92deng/users/usersHandlers"
 	"pok92deng/users/usersRepositories"
 	"pok92deng/users/usersUsecases"
+
+	"github.com/gin-gonic/gin"
 )
 
 type IModuleFactory interface {
-	//MonitorModule()
 	UsersModule()
 	ProductsModule()
 }
@@ -46,13 +47,13 @@ func (m *moduleFactory) UsersModule() {
 	usersGroup := m.r.Group("/users")
 	usersGroup.POST("/signup", userHandler.SignUpCustomer)
 	usersGroup.POST("/sign-in", userHandler.SignIn)
-	usersGroup.POST("/refresh", m.mid.JwtAuth(), userHandler.RefreshPassport)
-	//usersGroup.POST("/signup-admin", m.mid.JwtAuthAdmin(), userHandler.SignUpAdmin)
-	usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
+	usersGroup.POST("/refresh", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), userHandler.RefreshPassport)
+	usersGroup.POST("/signup-admin", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), userHandler.SignUpAdmin)
+	//usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	usersGroup.POST("/signup-admin-no-middleware", userHandler.SignUpAdmin)
 
-	usersGroup.GET("/:user_id", m.mid.JwtAuth(), m.mid.ParamCheck(), userHandler.GerUserProfile)
-	usersGroup.GET("/admin/secret", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.GenerateAdminToken)
+	usersGroup.GET("/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.ParamCheck(), userHandler.GerUserProfile)
+	usersGroup.GET("/admin/secret", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GenerateAdminToken)
 }
 
 func (m *moduleFactory) ProductsModule() {
@@ -61,11 +62,10 @@ func (m *moduleFactory) ProductsModule() {
 	productHandler := handlers.NewBeerHandlers(productUseCase)
 	beersGroup := m.r.Group("/beer")
 
-	beersGroup.GET("/list", m.mid.JwtAuth(), productHandler.ListBeers)
-	beersGroup.POST("/create", m.mid.JwtAuth(), m.mid.Authorize(2), productHandler.CreateBeer)
-	beersGroup.GET("/get/:id", m.mid.JwtAuth(), productHandler.GetBeer)
-	beersGroup.PATCH("/update/:id", m.mid.JwtAuth(), m.mid.Authorize(2), productHandler.UpdateBeer)
-	beersGroup.DELETE("/delete/:id", m.mid.JwtAuth(), m.mid.Authorize(2), productHandler.DeleteBeer)
-	beersGroup.GET("/filter", m.mid.JwtAuth(), productHandler.FilterBeersByName)
-	beersGroup.GET("/pagination", m.mid.JwtAuth(), productHandler.Pagination)
+	beersGroup.POST("/create", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.CreateBeer)
+	beersGroup.GET("/get/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), productHandler.GetBeer)
+	beersGroup.PATCH("/update/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.UpdateBeer)
+	beersGroup.DELETE("/delete/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.DeleteBeer)
+	beersGroup.PATCH("/get-update/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.GetUpdateBeer)
+	beersGroup.GET("/filter-and-paginate", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), productHandler.FilterAndPaginateBeers)
 }

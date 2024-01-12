@@ -18,9 +18,8 @@ type BeerRepository interface {
 	FindBeer(ctx context.Context, id primitive.ObjectID) (model.Beer, error)
 	UpdateBeer(ctx context.Context, id primitive.ObjectID, beer model.Beer) error
 	DeleteBeer(ctx context.Context, id primitive.ObjectID) error
-	ListBeers(ctx context.Context) ([]model.Beer, error)
-	FilterBeersByName(ctx context.Context, name string) ([]model.Beer, error)
-	Pagination(page, limit int64) ([]*model.Beer, int64, error)
+	FilterAndPaginateBeers(ctx context.Context, name string, page, limit int64) ([]*model.Beer, int64, error)
+	BeerNameExists(ctx context.Context, name string) (bool, error)
 }
 
 type productsRepository struct {
@@ -29,6 +28,9 @@ type productsRepository struct {
 }
 
 func NewproductsRepository(cfg config.IConfig, mongoDatabase *mongo.Database) BeerRepository {
+	if mongoDatabase == nil {
+		return nil
+	}
 	return &productsRepository{
 		cfg: cfg,
 		db:  mongoDatabase,
@@ -37,6 +39,9 @@ func NewproductsRepository(cfg config.IConfig, mongoDatabase *mongo.Database) Be
 
 func (r *productsRepository) BeerNameExists(ctx context.Context, name string) (bool, error) {
 	var beer model.Beer
+	if name == "" {
+		return false, errors.New("name cannot be empty")
+	}
 	filter := bson.M{"name": name}
 	err := r.db.Collection(r.cfg.Db().ProductsCollection()).FindOne(ctx, filter).Decode(&beer)
 	if err != nil {
@@ -58,19 +63,12 @@ func (r *productsRepository) InsertBeer(ctx context.Context, beer model.Beer) (p
 	}
 
 	result, err := r.db.Collection(r.cfg.Db().ProductsCollection()).InsertOne(ctx, beer)
+
 	if err != nil {
 		return primitive.NilObjectID, err
 	}
 	return result.InsertedID.(primitive.ObjectID), nil
 }
-
-//func (r *productsRepository) InsertBeer(ctx context.Context, beer model.Beer) (primitive.ObjectID, error) {
-//	result, err := r.db.Collection(r.cfg.Db().ProductsCollection()).InsertOne(ctx, beer)
-//	if err != nil {
-//		return primitive.NilObjectID, err
-//	}
-//	return result.InsertedID.(primitive.ObjectID), nil
-//}
 
 func (r *productsRepository) FindBeer(ctx context.Context, id primitive.ObjectID) (model.Beer, error) {
 	var beer model.Beer
@@ -95,74 +93,29 @@ func (r *productsRepository) UpdateBeer(ctx context.Context, id primitive.Object
 }
 
 func (r *productsRepository) DeleteBeer(ctx context.Context, id primitive.ObjectID) error {
-	update := bson.M{"$set": bson.M{"deleted": true}}
 
-	result, err := r.db.Collection(r.cfg.Db().ProductsCollection()).UpdateOne(ctx, bson.M{"_id": id}, update)
+	result, err := r.db.Collection(r.cfg.Db().ProductsCollection()).DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
 		return err
 	}
 
-	if result.MatchedCount == 0 {
+	if result.DeletedCount == 0 {
 		return errors.New("no beer found with specified ID")
 	}
 
 	return nil
 }
 
-func (r *productsRepository) ListBeers(ctx context.Context) ([]model.Beer, error) {
-	cursor, err := r.db.Collection(r.cfg.Db().ProductsCollection()).Find(ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-	defer func(cursor *mongo.Cursor, ctx context.Context) {
-		err := cursor.Close(ctx)
-		if err != nil {
-			fmt.Println("Error closing cursor:", err)
-		}
-	}(cursor, ctx)
-
-	var beers []model.Beer
-	for cursor.Next(ctx) {
-		var beer model.Beer
-		if err = cursor.Decode(&beer); err != nil {
-			return nil, err
-		}
-		beers = append(beers, beer)
-	}
-	return beers, nil
-}
-
-func (r *productsRepository) FilterBeersByName(ctx context.Context, name string) ([]model.Beer, error) {
-	var beers []model.Beer
-	filter := bson.M{"name": bson.M{"$regex": name, "$options": "i"}}
-	cursor, err := r.db.Collection(r.cfg.Db().ProductsCollection()).Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer func(cursor *mongo.Cursor, ctx context.Context) {
-		err := cursor.Close(ctx)
-		if err != nil {
-			fmt.Println("Error closing cursor:", err)
-		}
-	}(cursor, ctx)
-
-	for cursor.Next(ctx) {
-		var beer model.Beer
-		if err = cursor.Decode(&beer); err != nil {
-			return nil, err
-		}
-		beers = append(beers, beer)
-	}
-
-	return beers, nil
-}
-
-func (r *productsRepository) Pagination(page, limit int64) ([]*model.Beer, int64, error) {
+func (r *productsRepository) FilterAndPaginateBeers(ctx context.Context, name string, page, limit int64) ([]*model.Beer, int64, error) {
 	var beers []*model.Beer
-
 	skip := (page - 1) * limit
 
-	total, err := r.db.Collection(r.cfg.Db().ProductsCollection()).CountDocuments(context.Background(), bson.D{})
+	filter := bson.M{}
+	if name != "" {
+		filter["name"] = bson.M{"$regex": name, "$options": "i"}
+	}
+
+	total, err := r.db.Collection(r.cfg.Db().ProductsCollection()).CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -171,18 +124,18 @@ func (r *productsRepository) Pagination(page, limit int64) ([]*model.Beer, int64
 	findOptions.SetLimit(limit)
 	findOptions.SetSkip(skip)
 
-	cursor, err := r.db.Collection(r.cfg.Db().ProductsCollection()).Find(context.Background(), bson.D{}, findOptions)
+	cursor, err := r.db.Collection(r.cfg.Db().ProductsCollection()).Find(ctx, filter, findOptions)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error fetching beers with pagination: %w", err)
+		return nil, 0, fmt.Errorf("error fetching beers: %w", err)
 	}
 	defer func(cursor *mongo.Cursor, ctx context.Context) {
 		err := cursor.Close(ctx)
 		if err != nil {
 			fmt.Println("Error closing cursor:", err)
 		}
-	}(cursor, context.Background())
+	}(cursor, ctx)
 
-	for cursor.Next(context.Background()) {
+	for cursor.Next(ctx) {
 		var beer model.Beer
 		if err := cursor.Decode(&beer); err != nil {
 			return nil, 0, err

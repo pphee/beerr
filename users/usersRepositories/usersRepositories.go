@@ -116,9 +116,8 @@ func (r *usersRepository) InsertOauth(req *users.UserPassport) error {
 		return fmt.Errorf("insert oauth failed: %v", err)
 	}
 
-	// Assuming req.Token.Id is the field to store the generated ID
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		req.Token.Id = oid.Hex() // Convert ObjectID to hex string
+		req.Token.Id = oid.Hex()
 	} else {
 		return fmt.Errorf("failed to get inserted ID")
 	}
@@ -129,8 +128,6 @@ func (r *usersRepository) InsertOauth(req *users.UserPassport) error {
 func (r *usersRepository) FindOneOauth(refreshToken string) (*users.Oauth, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// Define a struct that matches the MongoDB document structure
 
 	var mongoPassport users.MongoPassport
 	filter := bson.M{"refresh_token": refreshToken}
@@ -144,7 +141,6 @@ func (r *usersRepository) FindOneOauth(refreshToken string) (*users.Oauth, error
 		return nil, fmt.Errorf("error finding oauth: %v", err)
 	}
 
-	// Construct UserPassport from the MongoPassport data
 	userPassport := users.UserPassport{
 		User: &users.User{
 			Id: mongoPassport.UserID,

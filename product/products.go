@@ -12,7 +12,7 @@ type Beer struct {
 	Detail    string                `form:"detail" binding:"required"`
 	Image     *multipart.FileHeader `form:"image"`
 	ImagePath string
-	Deleted   bool `bson:"deleted,omitempty"` // New field indicating soft delete
+	Deleted   bool `bson:"deleted,omitempty"`
 }
 
 type BeerPagingResult struct {
@@ -22,5 +22,18 @@ type BeerPagingResult struct {
 	NextPage  int     `json:"nextPage"`
 	Count     int     `json:"count"`
 	TotalPage int     `json:"totalPage"`
-	Beer      []*Beer `json:"beer"`
+	Data      []*Beer `json:"data"`
+}
+
+type UploadBeerImageResponse struct {
+	ID        primitive.ObjectID    `bson:"_id,omitempty"`
+	Image     *multipart.FileHeader `form:"image"`
+	ImagePath string
+}
+
+type BeerUpdate struct {
+	ID       primitive.ObjectID `bson:"_id,omitempty"`
+	Name     string             `form:"name" binding:"required"`
+	Category string             `form:"category" binding:"required"`
+	Detail   string             `form:"detail" binding:"required"`
 }

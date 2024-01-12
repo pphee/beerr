@@ -13,9 +13,7 @@ type BeerService interface {
 	GetBeer(ctx context.Context, id primitive.ObjectID) (model.Beer, error)
 	UpdateBeer(ctx context.Context, id primitive.ObjectID, beer model.Beer) error
 	DeleteBeer(ctx context.Context, id primitive.ObjectID) error
-	ListBeers(ctx context.Context) ([]model.Beer, error)
-	FilterBeersByName(ctx context.Context, name string) ([]model.Beer, error)
-	Pagination(page, limit int64) ([]*model.Beer, int64, error)
+	FilterAndPaginateBeers(ctx context.Context, name string, page, limit int64) ([]*model.Beer, int64, error)
 }
 
 type beerServiceImpl struct {
@@ -27,7 +25,6 @@ func NewBeerService(repo repository.BeerRepository) BeerService {
 }
 
 func (s *beerServiceImpl) CreateBeer(ctx context.Context, beer model.Beer) (primitive.ObjectID, error) {
-
 	return s.repo.InsertBeer(ctx, beer)
 }
 
@@ -43,14 +40,6 @@ func (s *beerServiceImpl) DeleteBeer(ctx context.Context, id primitive.ObjectID)
 	return s.repo.DeleteBeer(ctx, id)
 }
 
-func (s *beerServiceImpl) ListBeers(ctx context.Context) ([]model.Beer, error) {
-	return s.repo.ListBeers(ctx)
-}
-
-func (s *beerServiceImpl) FilterBeersByName(ctx context.Context, name string) ([]model.Beer, error) {
-	return s.repo.FilterBeersByName(ctx, name)
-}
-
-func (s *beerServiceImpl) Pagination(page, limit int64) ([]*model.Beer, int64, error) {
-	return s.repo.Pagination(page, limit)
+func (s *beerServiceImpl) FilterAndPaginateBeers(ctx context.Context, name string, page, limit int64) ([]*model.Beer, int64, error) {
+	return s.repo.FilterAndPaginateBeers(ctx, name, page, limit)
 }
