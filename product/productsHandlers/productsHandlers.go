@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -32,9 +33,15 @@ func NewBeerHandlers(service usecases.BeerService) BeerHandler {
 }
 
 func (h *BeerHandlers) CreateBeer(c *gin.Context) {
+	if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse multipart form", "details": err.Error()})
+		return
+	}
+
+	beerJSON := c.Request.FormValue("beer")
 	var beer model.Beer
-	if err := c.ShouldBind(&beer); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Form binding error", "details": err.Error()})
+	if err := json.Unmarshal([]byte(beerJSON), &beer); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON unmarshalling failed", "details": err.Error()})
 		return
 	}
 
@@ -43,7 +50,6 @@ func (h *BeerHandlers) CreateBeer(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	beer.ImagePath = imagePath
 
 	id, err := h.service.CreateBeer(c.Request.Context(), beer)
@@ -53,6 +59,28 @@ func (h *BeerHandlers) CreateBeer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"id": id})
+}
+
+func (h *BeerHandlers) UpdateBeer(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ID format"})
+		return
+	}
+
+	var beer model.Beer
+	if err := c.ShouldBind(&beer); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.UpdateBeer(c.Request.Context(), id, beer)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "beer updated"})
 }
 
 func (h *BeerHandlers) GetBeer(c *gin.Context) {
@@ -71,36 +99,6 @@ func (h *BeerHandlers) GetBeer(c *gin.Context) {
 	c.JSON(http.StatusOK, beer)
 }
 
-func (h *BeerHandlers) UpdateBeer(c *gin.Context) {
-	id, err := primitive.ObjectIDFromHex(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ID format"})
-		return
-	}
-
-	var beer model.Beer
-	if err := c.ShouldBind(&beer); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	imagePath, err := setBeerImage(c, &beer)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	beer.ImagePath = imagePath
-
-	err = h.service.UpdateBeer(c.Request.Context(), id, beer)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "beer updated"})
-}
-
 func (h *BeerHandlers) DeleteBeer(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -117,16 +115,20 @@ func (h *BeerHandlers) DeleteBeer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "beer deleted"})
 }
 
-func setBeerImage(c *gin.Context, beer *model.Beer) (string, error) {
+func setBeerImage(c *gin.Context, uploadImage *model.Beer) (string, error) {
 	file, err := c.FormFile("image")
 	if err != nil {
 		return "", fmt.Errorf("failed to get form file: %w", err)
 	}
 
-	if beer.ImagePath != "" {
-		oldImagePath := filepath.Join("uploads/beers", filepath.Base(beer.ImagePath))
-		if err := os.Remove(oldImagePath); err != nil {
-			return "", fmt.Errorf("failed to remove old image: %w", err)
+	if uploadImage.ImagePath != "" {
+		oldImagePath := filepath.Join("uploads/beers", filepath.Base(uploadImage.ImagePath))
+		if _, err := os.Stat(oldImagePath); err == nil {
+			if err := os.Remove(oldImagePath); err != nil {
+				return "", fmt.Errorf("failed to remove old image: %w", err)
+			}
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("error checking for old image: %w", err)
 		}
 	}
 

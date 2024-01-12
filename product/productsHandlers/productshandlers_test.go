@@ -45,6 +45,8 @@ func (m *mockUsecase) FilterAndPaginateBeers(ctx context.Context, name string, p
 }
 
 func TestBeerHandlers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	mockUsecase := new(mockUsecase)
 	handler := NewBeerHandlers(mockUsecase)
 
@@ -64,26 +66,28 @@ func TestBeerHandlers(t *testing.T) {
 
 	t.Run("CreateBeer", func(t *testing.T) {
 		r := gin.Default()
-		mockUsecase.On("CreateBeer", mock.Anything, testBeer).Return(testBeer.ID, nil)
+		mockUsecase.On("CreateBeer", mock.Anything, mock.AnythingOfType("model.Beer")).Return(testBeer.ID, nil)
 
 		r.POST("/beers", handler.CreateBeer)
 
-		// Create a buffer to write our multipart form
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 
-		// Add the JSON fields
-		jsonPart, _ := writer.CreateFormField("json")
-		jsonBytes, _ := json.Marshal(testBeer)
+		jsonPart, err := writer.CreateFormField("beer")
+		assert.NoError(t, err)
+
+		jsonBytes, err := json.Marshal(testBeer)
+		assert.NoError(t, err)
 		jsonPart.Write(jsonBytes)
 
-		// Add the file (if necessary)
-		filePart, _ := writer.CreateFormFile("file_field_name", "filename.jpg")
-		filePart.Write([]byte("file content")) // Replace with actual file content
+		filePart, err := writer.CreateFormFile("image", "filename.jpg")
+		assert.NoError(t, err)
+		filePart.Write([]byte("file content"))
 
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/beers", body)
+		req, err := http.NewRequest("POST", "/beers", body)
+		assert.NoError(t, err)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 
 		w := httptest.NewRecorder()
@@ -92,58 +96,58 @@ func TestBeerHandlers(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, w.Code)
 	})
 
-	//t.Run("GetBeer", func(t *testing.T) {
-	//	r := gin.Default()
-	//	mockUsecase.On("GetBeer", mock.Anything, testBeer.ID).Return(testBeer, nil)
-	//
-	//	r.GET("/beers/:id", handler.GetBeer)
-	//
-	//	req, _ := http.NewRequest("GET", "/beers/"+testBeer.ID.Hex(), nil)
-	//
-	//	w := httptest.NewRecorder()
-	//	r.ServeHTTP(w, req)
-	//	assert.Equal(t, http.StatusOK, w.Code)
-	//})
-	//
-	//t.Run("UpdateBeer", func(t *testing.T) {
-	//	r := gin.Default()
-	//	mockUsecase.On("UpdateBeer", mock.Anything, testBeer.ID, testBeer).Return(nil)
-	//
-	//	r.PUT("/beers/:id", handler.UpdateBeer)
-	//
-	//	body, _ := json.Marshal(testBeer)
-	//	req, _ := http.NewRequest("PUT", "/beers/"+testBeer.ID.Hex(), bytes.NewBuffer(body))
-	//	req.Header.Set("Content-Type", "application/json")
-	//
-	//	w := httptest.NewRecorder()
-	//	r.ServeHTTP(w, req)
-	//	assert.Equal(t, http.StatusOK, w.Code)
-	//})
-	//
-	//t.Run("DeleteBeer", func(t *testing.T) {
-	//	r := gin.Default()
-	//	mockUsecase.On("DeleteBeer", mock.Anything, testBeer.ID).Return(nil)
-	//
-	//	r.DELETE("/beers/:id", handler.DeleteBeer)
-	//
-	//	req, _ := http.NewRequest("DELETE", "/beers/"+testBeer.ID.Hex(), nil)
-	//
-	//	w := httptest.NewRecorder()
-	//	r.ServeHTTP(w, req)
-	//	assert.Equal(t, http.StatusOK, w.Code)
-	//
-	//})
-	//
-	//t.Run("FilterAndPaginateBeers", func(t *testing.T) {
-	//	r := gin.Default()
-	//	mockUsecase.On("FilterAndPaginateBeers", mock.Anything, testBeer.Name, int64(1), int64(10)).Return([]*model.Beer{&testBeer}, int64(1), nil)
-	//
-	//	r.GET("/beers", handler.FilterAndPaginateBeers)
-	//
-	//	req, _ := http.NewRequest("GET", "/beers", nil)
-	//
-	//	w := httptest.NewRecorder()
-	//	r.ServeHTTP(w, req)
-	//	assert.Equal(t, http.StatusOK, w.Code)
-	//})
+	t.Run("GetBeer", func(t *testing.T) {
+		r := gin.Default()
+		mockUsecase.On("GetBeer", mock.Anything, testBeer.ID).Return(testBeer, nil)
+
+		r.GET("/beers/:id", handler.GetBeer)
+
+		req, _ := http.NewRequest("GET", "/beers/"+testBeer.ID.Hex(), nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("UpdateBeer", func(t *testing.T) {
+		r := gin.Default()
+		mockUsecase.On("UpdateBeer", mock.Anything, testBeer.ID, testBeer).Return(nil)
+
+		r.PUT("/beers/:id", handler.UpdateBeer)
+
+		body, _ := json.Marshal(testBeer)
+		req, _ := http.NewRequest("PUT", "/beers/"+testBeer.ID.Hex(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("FilterAndPaginateBeers", func(t *testing.T) {
+		r := gin.Default()
+		mockUsecase.On("FilterAndPaginateBeers", mock.Anything, testBeer.Name, int64(1), int64(10)).Return([]*model.Beer{&testBeer}, int64(1), nil)
+
+		r.GET("/beers", handler.FilterAndPaginateBeers)
+
+		req, _ := http.NewRequest("GET", "/beers?name="+testBeer.Name+"&page=1&limit=10", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("DeleteBeer", func(t *testing.T) {
+		r := gin.Default()
+		mockUsecase.On("DeleteBeer", mock.Anything, testBeer.ID).Return(nil)
+
+		r.DELETE("/beers/:id", handler.DeleteBeer)
+
+		req, _ := http.NewRequest("DELETE", "/beers/"+testBeer.ID.Hex(), nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+	})
 }
