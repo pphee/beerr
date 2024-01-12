@@ -18,9 +18,7 @@ type BeerHandler interface {
 	GetBeer(c *gin.Context)
 	UpdateBeer(c *gin.Context)
 	DeleteBeer(c *gin.Context)
-	ListBeers(c *gin.Context)
-	FilterBeersByName(c *gin.Context)
-	Pagination(c *gin.Context)
+	FilterAndPaginateBeers(c *gin.Context)
 }
 
 type BeerHandlers struct {
@@ -35,7 +33,7 @@ func NewBeerHandlers(service usecases.BeerService) BeerHandler {
 
 func (h *BeerHandlers) CreateBeer(c *gin.Context) {
 	var beer model.Beer
-	if err := c.ShouldBind(&beer); err != nil { // Changed to ShouldBind for form data
+	if err := c.ShouldBind(&beer); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Form binding error", "details": err.Error()})
 		return
 	}
@@ -119,16 +117,6 @@ func (h *BeerHandlers) DeleteBeer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "beer deleted"})
 }
 
-func (h *BeerHandlers) ListBeers(c *gin.Context) {
-	beers, err := h.service.ListBeers(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, beers)
-}
-
 func setBeerImage(c *gin.Context, beer *model.Beer) (string, error) {
 	file, err := c.FormFile("image")
 	if err != nil {
@@ -155,26 +143,17 @@ func setBeerImage(c *gin.Context, beer *model.Beer) (string, error) {
 	return "https://hzbxs242-3000.asse.devtunnels.ms" + "/" + filePath, nil
 }
 
-func (h *BeerHandlers) FilterBeersByName(c *gin.Context) {
+func (h *BeerHandlers) FilterAndPaginateBeers(c *gin.Context) {
 	name := c.Query("name")
-	beers, err := h.service.FilterBeersByName(c.Request.Context(), name)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, beers)
-}
-
-func (h *BeerHandlers) Pagination(c *gin.Context) {
 	page, limit, err := getPaginationParams(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	beersData, total, err := h.service.Pagination(int64(page), int64(limit))
+	beers, total, err := h.service.FilterAndPaginateBeers(c.Request.Context(), name, int64(page), int64(limit))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve beers"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -191,7 +170,7 @@ func (h *BeerHandlers) Pagination(c *gin.Context) {
 		NextPage:  pagination.NextPage,
 		Count:     pagination.Count,
 		TotalPage: pagination.TotalPage,
-		Beer:      beersData,
+		Data:      beers,
 	}
 
 	c.JSON(http.StatusOK, response)
