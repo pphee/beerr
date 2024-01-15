@@ -47,7 +47,8 @@ func (m *moduleFactory) UsersModule() {
 	usersGroup := m.r.Group("/users")
 	usersGroup.POST("/signup", userHandler.SignUpCustomer)
 	usersGroup.POST("/sign-in", userHandler.SignIn)
-	usersGroup.POST("/refresh", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), userHandler.RefreshPassport)
+	usersGroup.POST("/refresh", userHandler.RefreshPassport)
+	usersGroup.POST("/refresh-admin", userHandler.RefreshPassportAdmin)
 	usersGroup.POST("/signup-admin", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), userHandler.SignUpAdmin)
 	//usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	usersGroup.POST("/signup-admin-no-middleware", userHandler.SignUpAdmin)
@@ -66,6 +67,5 @@ func (m *moduleFactory) ProductsModule() {
 	beersGroup.GET("/get/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), productHandler.GetBeer)
 	beersGroup.PATCH("/update/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.UpdateBeer)
 	beersGroup.DELETE("/delete/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.DeleteBeer)
-	beersGroup.PATCH("/get-update/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), productHandler.GetUpdateBeer)
 	beersGroup.GET("/filter-and-paginate", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), productHandler.FilterAndPaginateBeers)
 }

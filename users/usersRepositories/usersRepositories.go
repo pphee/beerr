@@ -75,6 +75,16 @@ func (r *usersRepository) checkUserExistence(email, username string) error {
 	return nil
 }
 
+func (r *usersRepository) FindOneUserByUsername(username string) (*users.UserCredentialCheck, error) {
+	filter := bson.M{"username": username}
+	return r.FindOneUser(filter)
+}
+
+func (r *usersRepository) FindOneUserByEmail(email string) (*users.UserCredentialCheck, error) {
+	filter := bson.M{"email": email}
+	return r.FindOneUser(filter)
+}
+
 func (r *usersRepository) FindOneUser(filter bson.M) (*users.UserCredentialCheck, error) {
 	var user users.UserCredentialCheck
 
@@ -87,16 +97,6 @@ func (r *usersRepository) FindOneUser(filter bson.M) (*users.UserCredentialCheck
 	}
 
 	return &user, nil
-}
-
-func (r *usersRepository) FindOneUserByUsername(username string) (*users.UserCredentialCheck, error) {
-	filter := bson.M{"username": username}
-	return r.FindOneUser(filter)
-}
-
-func (r *usersRepository) FindOneUserByEmail(email string) (*users.UserCredentialCheck, error) {
-	filter := bson.M{"email": email}
-	return r.FindOneUser(filter)
 }
 
 func (r *usersRepository) InsertOauth(req *users.UserPassport) error {

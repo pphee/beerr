@@ -15,6 +15,7 @@ type IUsersUsecase interface {
 	RefreshPassport(req *users.UserRefreshCredential) (*users.UserPassport, error)
 	GetUserProfile(userId string) (*users.User, error)
 	InsertAdmin(req *users.UserRegisterReq) (*users.UserPassport, error)
+	RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error)
 }
 
 type usersUsecase struct {
@@ -78,6 +79,9 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 		tokenType = auth.Access
 	}
 
+	fmt.Println("tokenType", tokenType)
+	fmt.Println("user", user.RoleId)
+
 	// Sign token based on the user role
 	token, err := auth.NewAuth(tokenType, u.cfg.Jwt(), &users.UserClaims{
 		Id:     user.Id,
@@ -135,6 +139,65 @@ func (u *usersUsecase) RefreshPassport(req *users.UserRefreshCredential) (*users
 	if err != nil {
 		return nil, err
 	}
+
+	newClaims := &users.UserClaims{
+		Id:     profile.Id,
+		RoleId: profile.RoleId,
+	}
+
+	accessToken, err := auth.NewAuth(
+		auth.Access,
+		u.cfg.Jwt(),
+		newClaims,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken := auth.RepeatToken(
+		u.cfg.Jwt(),
+		newClaims,
+		claims.ExpiresAt.Unix(),
+	)
+
+	passport := &users.UserPassport{
+		User: profile,
+		Token: &users.UserToken{
+			Id:           oauth.Id,
+			AccessToken:  accessToken.SignToken(),
+			RefreshToken: refreshToken,
+		},
+	}
+
+	if err := u.userRepository.UpdateOauth(passport.Token); err != nil {
+		return nil, err
+	}
+	return passport, nil
+}
+
+func (u *usersUsecase) RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error) {
+	claims, err := auth.ParseAdminToken(u.cfg.Jwt(), req.RefreshToken)
+
+	if err != nil {
+		fmt.Println("err", err)
+		return nil, err
+	}
+
+	// Check oauth
+	oauth, err := u.userRepository.FindOneOauth(req.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("oauth", oauth)
+
+	// Find profile
+	profile, err := u.userRepository.GetProfile(oauth.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("profile", profile)
 
 	newClaims := &users.UserClaims{
 		Id:     profile.Id,

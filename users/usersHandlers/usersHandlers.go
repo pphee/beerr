@@ -18,6 +18,7 @@ type IUserHandler interface {
 	GenerateAdminToken(c *gin.Context)
 	GerUserProfile(c *gin.Context)
 	SignUpAdmin(c *gin.Context)
+	RefreshPassportAdmin(c *gin.Context)
 }
 
 type usersHandler struct {
@@ -114,6 +115,22 @@ func (h *usersHandler) RefreshPassport(c *gin.Context) {
 	}
 
 	passport, err := h.usersUsecase.RefreshPassport(req)
+	if err != nil {
+		h.respondWithError(c, http.StatusBadRequest, "Error refreshing passport: "+err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, passport)
+}
+
+func (h *usersHandler) RefreshPassportAdmin(c *gin.Context) {
+	req := new(users.UserRefreshCredential)
+	if err := c.ShouldBindJSON(req); err != nil {
+		h.respondWithError(c, http.StatusBadRequest, "Invalid request format")
+		return
+	}
+
+	passport, err := h.usersUsecase.RefreshPassportAdmin(req)
 	if err != nil {
 		h.respondWithError(c, http.StatusBadRequest, "Error refreshing passport: "+err.Error())
 		return

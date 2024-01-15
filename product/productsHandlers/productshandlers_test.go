@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	model "pok92deng/product"
+	"strings"
 	"testing"
 )
 
@@ -96,6 +97,63 @@ func TestBeerHandlers(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, w.Code)
 	})
 
+	t.Run("CreateBeer with multipart form parsing error", func(t *testing.T) {
+		// Setup
+		r := gin.Default()
+		r.POST("/beers", handler.CreateBeer)
+
+		// Sending a bad request
+		req, _ := http.NewRequest("POST", "/beers", bytes.NewBufferString("bad request"))
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("CreateBeer with JSON unmarshalling error", func(t *testing.T) {
+		// Setup
+		r := gin.Default()
+		r.POST("/beers", handler.CreateBeer)
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+
+		jsonPart, _ := writer.CreateFormField("beer")
+		jsonPart.Write([]byte("{malformed JSON"))
+
+		writer.Close()
+		req, _ := http.NewRequest("POST", "/beers", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("CreateBeer with internal server error", func(t *testing.T) {
+		r := gin.Default()
+		r.POST("/beers", handler.CreateBeer)
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+
+		jsonPart, _ := writer.CreateFormField("beer")
+		jsonBytes, _ := json.Marshal(testBeer)
+		jsonPart.Write(jsonBytes)
+
+		writer.Close()
+		req, _ := http.NewRequest("POST", "/beers", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	})
+
 	t.Run("GetBeer", func(t *testing.T) {
 		r := gin.Default()
 		mockUsecase.On("GetBeer", mock.Anything, testBeer.ID).Return(testBeer, nil)
@@ -107,6 +165,18 @@ func TestBeerHandlers(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("GetBeer with invalid ID format", func(t *testing.T) {
+		r := gin.Default()
+		r.GET("/beers/:id", handler.GetBeer)
+
+		req, _ := http.NewRequest("GET", "/beers/invalid-id", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("UpdateBeer", func(t *testing.T) {
@@ -124,6 +194,32 @@ func TestBeerHandlers(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
+	t.Run("UpdateBeer with invalid ID format", func(t *testing.T) {
+		r := gin.Default()
+		r.PUT("/beers/:id", handler.UpdateBeer)
+
+		req, _ := http.NewRequest("PUT", "/beers/invalid-id", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("UpdateBeer with binding error", func(t *testing.T) {
+		r := gin.Default()
+		r.PUT("/beers/:id", handler.UpdateBeer)
+
+		incompleteData := `name=Test&detail=Test Detail`
+		req, _ := http.NewRequest("PUT", "/beers/valid-id", strings.NewReader(incompleteData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
 	t.Run("FilterAndPaginateBeers", func(t *testing.T) {
 		r := gin.Default()
 		mockUsecase.On("FilterAndPaginateBeers", mock.Anything, testBeer.Name, int64(1), int64(10)).Return([]*model.Beer{&testBeer}, int64(1), nil)
@@ -135,6 +231,55 @@ func TestBeerHandlers(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("FilterAndPaginateBeers with invalid page", func(t *testing.T) {
+		r := gin.Default()
+		r.GET("/beers", handler.FilterAndPaginateBeers)
+
+		req, _ := http.NewRequest("GET", "/beers?name="+testBeer.Name+"&page=invalid-page&limit=10", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("FilterAndPaginateBeers with invalid limit", func(t *testing.T) {
+		r := gin.Default()
+		r.GET("/beers", handler.FilterAndPaginateBeers)
+
+		req, _ := http.NewRequest("GET", "/beers?name="+testBeer.Name+"&page=1&limit=invalid-limit", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("FilterAndPaginateBeers with error", func(t *testing.T) {
+		r := gin.Default()
+		mockUsecase.On("FilterAndPaginateBeers", mock.Anything, testBeer.Name, int64(1), int64(10)).Return([]*model.Beer{&testBeer}, int64(1), nil)
+
+		r.GET("/beers", handler.FilterAndPaginateBeers)
+
+		req, _ := http.NewRequest("GET", "/beers?name="+testBeer.Name+"&page=1&limit=10", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("FilterAndPaginateBeers with invalid pagination parameters", func(t *testing.T) {
+		r := gin.Default()
+		r.GET("/beers", handler.FilterAndPaginateBeers)
+
+		req, _ := http.NewRequest("GET", "/beers?page=invalid&limit=invalid", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("DeleteBeer", func(t *testing.T) {
@@ -149,5 +294,17 @@ func TestBeerHandlers(t *testing.T) {
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 
+	})
+
+	t.Run("DeleteBeer with invalid ID format", func(t *testing.T) {
+		r := gin.Default()
+		r.DELETE("/beers/:id", handler.DeleteBeer)
+
+		req, _ := http.NewRequest("DELETE", "/beers/invalid-id", nil)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }

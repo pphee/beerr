@@ -100,19 +100,28 @@ func ParseCustomerToken(cfg config.IJwtConfig, tokenString string) (*MapClaims, 
 func ParseAdminToken(cfg config.IJwtConfig, tokenString string) (*MapClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &MapClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Method.Alg())
 		}
-		return []byte(cfg.AdminKey()), nil
+		return []byte(cfg.SecretKey()), nil
 	})
 
+	fmt.Println("token", token)
+
 	if err != nil {
+		fmt.Printf("Error parsing token: %v\n", err)
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(*MapClaims); ok && token.Valid {
-		return claims, nil
+	if claims, ok := token.Claims.(*MapClaims); ok {
+		if token.Valid {
+			return claims, nil
+		} else {
+			fmt.Println("Token is not valid")
+			return nil, fmt.Errorf("token is invalid")
+		}
 	} else {
-		return nil, fmt.Errorf("claims type is invalid or token is not valid")
+		fmt.Println("Claims type is invalid")
+		return nil, fmt.Errorf("claims type is invalid")
 	}
 }
 
