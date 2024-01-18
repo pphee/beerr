@@ -49,11 +49,13 @@ func (m *moduleFactory) UsersModule() {
 	usersGroup.POST("/sign-in", userHandler.SignIn)
 	usersGroup.POST("/refresh", userHandler.RefreshPassport)
 	usersGroup.POST("/refresh-admin", userHandler.RefreshPassportAdmin)
-	usersGroup.POST("/signup-admin", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), userHandler.SignUpAdmin)
+	usersGroup.POST("/signup-admin", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	//usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	usersGroup.POST("/signup-admin-no-middleware", userHandler.SignUpAdmin)
 
 	usersGroup.GET("/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.ParamCheck(), userHandler.GerUserProfile)
+	usersGroup.GET("/get-all-user", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GetAllUserProfile)
+	usersGroup.PATCH("/update-role/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), m.mid.Authorize(2), userHandler.UpdateRole)
 	usersGroup.GET("/admin/secret", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GenerateAdminToken)
 }
 

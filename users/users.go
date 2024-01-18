@@ -49,7 +49,6 @@ func (obj *UserRegisterReq) IsEmail() bool {
 }
 
 func (obj *UserRegisterReq) IsPassword() bool {
-	fmt.Println("obj.Password", obj.Password)
 	pattern := `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$`
 	match, err := regexp.MatchString(pattern, obj.Password)
 	if err != nil {
@@ -107,4 +106,8 @@ func NewHTTPError(statusCode int, message string) *HTTPError {
 		StatusCode: statusCode,
 		Message:    message,
 	}
+}
+
+type RoleUpdateRequest struct {
+	RoleID string `json:"role_id"`
 }

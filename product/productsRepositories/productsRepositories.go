@@ -79,9 +79,22 @@ func (r *productsRepository) FindBeer(ctx context.Context, id primitive.ObjectID
 }
 
 func (r *productsRepository) UpdateBeer(ctx context.Context, id primitive.ObjectID, beer model.Beer) error {
-	update := bson.M{
-		"$set": beer,
+	if beer.Image == nil || beer.ImagePath == "" {
+		existingBeer, err := r.FindBeer(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		if beer.Image == nil {
+			beer.Image = existingBeer.Image
+		}
+
+		if beer.ImagePath == "" {
+			beer.ImagePath = existingBeer.ImagePath
+		}
 	}
+
+	update := bson.M{"$set": beer}
 	result, err := r.db.Collection(r.cfg.Db().ProductsCollection()).UpdateOne(ctx, bson.M{"_id": id}, update)
 	if err != nil {
 		return err

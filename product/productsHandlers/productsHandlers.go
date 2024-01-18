@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -38,14 +38,13 @@ func (h *BeerHandlers) CreateBeer(c *gin.Context) {
 		return
 	}
 
-	beerJSON := c.Request.FormValue("beer")
 	var beer model.Beer
-	if err := json.Unmarshal([]byte(beerJSON), &beer); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON unmarshalling failed", "details": err.Error()})
+	if err := c.ShouldBind(&beer); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	imagePath, err := setBeerImage(c, &beer)
+	imagePath, err := SetBeerImage(c, &beer)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -73,6 +72,17 @@ func (h *BeerHandlers) UpdateBeer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	imagePath, err := SetBeerImage(c, &beer)
+	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) {
+			imagePath = ""
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	beer.ImagePath = imagePath
 
 	err = h.service.UpdateBeer(c.Request.Context(), id, beer)
 	if err != nil {
@@ -115,16 +125,31 @@ func (h *BeerHandlers) DeleteBeer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "beer deleted"})
 }
 
-func setBeerImage(c *gin.Context, uploadImage *model.Beer) (string, error) {
+type FileOps interface {
+	Remove(name string) error
+}
+
+type RealFileOps struct{}
+
+func (RealFileOps) Remove(name string) error {
+	return os.Remove(name)
+}
+
+var fileOps FileOps = RealFileOps{}
+
+func SetBeerImage(c *gin.Context, uploadImage *model.Beer) (string, error) {
 	file, err := c.FormFile("image")
 	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) {
+			return uploadImage.ImagePath, nil
+		}
 		return "", fmt.Errorf("failed to get form file: %w", err)
 	}
 
 	if uploadImage.ImagePath != "" {
 		oldImagePath := filepath.Join("uploads/beers", filepath.Base(uploadImage.ImagePath))
 		if _, err := os.Stat(oldImagePath); err == nil {
-			if err := os.Remove(oldImagePath); err != nil {
+			if err := fileOps.Remove(oldImagePath); err != nil {
 				return "", fmt.Errorf("failed to remove old image: %w", err)
 			}
 		} else if !os.IsNotExist(err) {

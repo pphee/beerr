@@ -76,6 +76,13 @@ func (h *middlewaresHandler) Authorize(expectRoleId ...int) gin.HandlerFunc {
 			return
 		}
 
+		if len(roles) == 0 {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"error": "Role list is empty",
+			})
+			return
+		}
+
 		expectValueBinary := utils.BinaryConverter(sumRoles(expectRoleId...), len(roles))
 		userValueBinary := utils.BinaryConverter(userRoleId.(int), len(roles))
 

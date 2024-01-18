@@ -2,12 +2,14 @@ package usersHandlers
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pok92deng/config"
 	auth "pok92deng/pkg"
 	"pok92deng/users"
 	"pok92deng/users/usersUsecases"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +21,8 @@ type IUserHandler interface {
 	GerUserProfile(c *gin.Context)
 	SignUpAdmin(c *gin.Context)
 	RefreshPassportAdmin(c *gin.Context)
+	GetAllUserProfile(c *gin.Context)
+	UpdateRole(c *gin.Context)
 }
 
 type usersHandler struct {
@@ -45,21 +49,21 @@ func (h *usersHandler) SignUpCustomer(c *gin.Context) {
 	}
 
 	// Email validation
-	if !req.IsEmail() {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid email format",
-			"message": "email pattern is invalid",
-		})
-		return
-	}
-
-	//if !req.IsPassword() {
+	//if !req.IsEmail() {
 	//	c.JSON(http.StatusBadRequest, gin.H{
-	//		"error":   "Invalid password format",
-	//		"message": "password pattern is invalid",
+	//		"error":   "Invalid email format",
+	//		"message": "email pattern is invalid",
 	//	})
 	//	return
 	//}
+
+	if !req.IsPassword() {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid password format",
+			"message": "password pattern is invalid",
+		})
+		return
+	}
 
 	// Insert
 	result, err := h.usersUsecase.InsertCustomer(req)
@@ -92,6 +96,7 @@ func (h *usersHandler) SignIn(c *gin.Context) {
 
 	passport, err := h.usersUsecase.GetPassport(&req)
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error":   "Authentication failed",
 			"details": err.Error(),
@@ -115,22 +120,6 @@ func (h *usersHandler) RefreshPassport(c *gin.Context) {
 	}
 
 	passport, err := h.usersUsecase.RefreshPassport(req)
-	if err != nil {
-		h.respondWithError(c, http.StatusBadRequest, "Error refreshing passport: "+err.Error())
-		return
-	}
-
-	c.JSON(http.StatusOK, passport)
-}
-
-func (h *usersHandler) RefreshPassportAdmin(c *gin.Context) {
-	req := new(users.UserRefreshCredential)
-	if err := c.ShouldBindJSON(req); err != nil {
-		h.respondWithError(c, http.StatusBadRequest, "Invalid request format")
-		return
-	}
-
-	passport, err := h.usersUsecase.RefreshPassportAdmin(req)
 	if err != nil {
 		h.respondWithError(c, http.StatusBadRequest, "Error refreshing passport: "+err.Error())
 		return
@@ -195,6 +184,22 @@ func (h *usersHandler) GenerateAdminToken(c *gin.Context) {
 	})
 }
 
+func (h *usersHandler) RefreshPassportAdmin(c *gin.Context) {
+	req := new(users.UserRefreshCredential)
+	if err := c.ShouldBindJSON(req); err != nil {
+		h.respondWithError(c, http.StatusBadRequest, "Invalid request format")
+		return
+	}
+
+	passport, err := h.usersUsecase.RefreshPassportAdmin(req)
+	if err != nil {
+		h.respondWithError(c, http.StatusBadRequest, "Error refreshing passport: "+err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, passport)
+}
+
 func (h *usersHandler) GerUserProfile(c *gin.Context) {
 	userId := strings.Trim(c.Param("user_id"), " ")
 
@@ -215,4 +220,46 @@ func (h *usersHandler) GerUserProfile(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *usersHandler) GetAllUserProfile(c *gin.Context) {
+	result, err := h.usersUsecase.GetAllUserProfile()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *usersHandler) UpdateRole(c *gin.Context) {
+	userId := strings.Trim(c.Param("user_id"), " ")
+
+	var req users.RoleUpdateRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	roleId, err := strconv.Atoi(req.RoleID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid role ID",
+		})
+		return
+	}
+
+	if err := h.usersUsecase.UpdateRole(userId, roleId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Update role successfully",
+	})
 }

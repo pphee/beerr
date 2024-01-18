@@ -3,6 +3,7 @@ package usersRepositories
 import (
 	"context"
 	"github.com/tryvium-travels/memongo"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
@@ -62,15 +63,111 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 		Username: "phee",
 	}
 
+	testAdmin := &users.UserRegisterReq{
+		Email:    "p@gmail.com",
+		Password: "123456",
+		Username: "p",
+	}
+
+	userID := primitive.NewObjectID()
+
+	oauthUser := &users.UserPassport{
+		User: &users.User{
+			Id:       userID,
+			Email:    "pheeDan@gmail.com",
+			Username: "testuser",
+			RoleId:   1,
+		},
+		Token: &users.UserToken{
+			AccessToken:  "access-token",
+			RefreshToken: "refresh-token",
+		},
+	}
+
+	var validUserID string
+
 	t.Run("InsertUser", func(t *testing.T) {
+		user, err := repo.InsertUser(testUser, false)
+		if err != nil {
+			t.Error(err)
+		} else {
+			validUserID = user.User.Id.Hex()
+		}
+	})
+
+	t.Run("checkUserExistenceForDuplicateInsert", func(t *testing.T) {
 		_, err := repo.InsertUser(testUser, false)
+		if err == nil {
+			t.Error("Expected error for existing user, got nil")
+		}
+	})
+
+	t.Run("checkUserExistenceForDuplicateInsert", func(t *testing.T) {
+		err := repo.CheckUserExistence(testUser.Email, testUser.Username)
+		if err == nil {
+			t.Error("Expected error for existing user, got nil")
+		}
+	})
+
+	t.Run("ErrorInAdminOrCustomer", func(t *testing.T) {
+		_, err := repo.InsertUser(testUser, true)
+		if err == nil {
+			t.Errorf("Expected error, got nil")
+		}
+	})
+
+	t.Run("ErrorInResult", func(t *testing.T) {
+		_, err := repo.InsertUser(testUser, false)
+		if err == nil {
+			t.Errorf("Expected error, got nil")
+		}
+	})
+
+	t.Run("FindOneUserByEmail", func(t *testing.T) {
+		_, err := repo.FindOneUserByEmail(testUser.Email)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("FindOneUserByUsername", func(t *testing.T) {
+		_, err := repo.FindOneUserByUsername(testUser.Username)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 
 	t.Run("InsertAdmin", func(t *testing.T) {
-		_, err := repo.InsertUser(testUser, true)
+		_, err := repo.InsertUser(testAdmin, true)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("InsertOauth", func(t *testing.T) {
+		err := repo.InsertOauth(oauthUser)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("UpdateOauth", func(t *testing.T) {
+		oauth, err := repo.FindOneOauth("refresh-token")
+
+		oauthUserUpdate := &users.UserToken{
+			Id:           oauth.Id, // Correctly referencing the ID
+			AccessToken:  "access-tokenUpdate",
+			RefreshToken: "refresh-tokenUpdate",
+		}
+
+		err = repo.UpdateOauth(oauthUserUpdate)
+		if err != nil {
+			t.Error("UpdateOauth failed:", err)
+		}
+	})
+
+	t.Run("FindOneOauth", func(t *testing.T) {
+		_, err := repo.FindOneOauth("refresh-tokenUpdate")
 		if err != nil {
 			t.Error(err)
 		}
@@ -83,24 +180,15 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 		}
 	})
 
-	t.Run("InsertOauth", func(t *testing.T) {
-		_, err := repo.InsertUser(testUser, false)
-		if err != nil {
-			t.Error(err)
-		}
-	})
-
-	t.Run("FindOneOauth", func(t *testing.T) {
-		_, err := repo.FindOneUserByEmail(testUser.Email)
-		if err != nil {
-			t.Error(err)
-		}
-	})
-
 	t.Run("GetProfile", func(t *testing.T) {
-		_, err := repo.GetProfile(testUser.Email)
-		if err != nil {
-			t.Error(err)
+		if validUserID == "" {
+			t.Skip("Valid user ID not available")
+		} else {
+			_, err := repo.GetProfile(validUserID)
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	})
+
 }

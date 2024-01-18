@@ -13,10 +13,10 @@ import (
 type TokenType string
 
 const (
-	Access  TokenType = "access"
-	Refresh TokenType = "refresh"
-	Admin   TokenType = "admin"
-	ApiKey  TokenType = "apikey"
+	Access            TokenType = "access"
+	Refresh           TokenType = "refresh"
+	Admin             TokenType = "admin"
+	RefreshTokenAdmin TokenType = "refresh-token-admin"
 )
 
 type Auth struct {
@@ -49,9 +49,15 @@ func jwtTimeRepeatAdapter(t int64) *jwt.NumericDate {
 	return jwt.NewNumericDate(time.Unix(t, 0))
 }
 
+func (a *authAdmin) SignToken() string {
+	secretAdminKey := []byte(a.cfg.AdminKey())
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, a.mapClaims)
+	ss, _ := token.SignedString(secretAdminKey)
+	return ss
+}
+
 func (a *Auth) SignToken() string {
 	secretKey := []byte(a.cfg.SecretKey())
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, a.mapClaims)
 
 	ss, err := token.SignedString(secretKey)
@@ -59,14 +65,6 @@ func (a *Auth) SignToken() string {
 		fmt.Println("err", err)
 		return ""
 	}
-
-	return ss
-}
-
-func (a *authAdmin) SignToken() string {
-	secretAdminKey := []byte(a.cfg.AdminKey())
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, a.mapClaims)
-	ss, _ := token.SignedString(secretAdminKey)
 	return ss
 }
 
@@ -102,10 +100,8 @@ func ParseAdminToken(cfg config.IJwtConfig, tokenString string) (*MapClaims, err
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Method.Alg())
 		}
-		return []byte(cfg.SecretKey()), nil
+		return []byte(cfg.AdminKey()), nil
 	})
-
-	fmt.Println("token", token)
 
 	if err != nil {
 		fmt.Printf("Error parsing token: %v\n", err)
@@ -133,10 +129,30 @@ func RepeatToken(cfg config.IJwtConfig, claims *users.UserClaims, exp int64) str
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    "goEcommerce-api",
 				Subject:   "refresh-token",
-				Audience:  []string{"customer", "admin"},
+				Audience:  []string{"user"},
 				ExpiresAt: jwtTimeRepeatAdapter(exp),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+		},
+	}
+	return obj.SignToken()
+}
+
+func RepeatAdminToken(cfg config.IJwtConfig, claims *users.UserClaims, exp int64) string {
+	obj := &authAdmin{
+		Auth: &Auth{
+			cfg: cfg,
+			mapClaims: &MapClaims{
+				Claims: claims,
+				RegisteredClaims: jwt.RegisteredClaims{
+					Issuer:    "goEcommerce-api",
+					Subject:   "refresh-admin-token",
+					Audience:  []string{"admin"},
+					ExpiresAt: jwtTimeRepeatAdapter(exp),
+					NotBefore: jwt.NewNumericDate(time.Now()),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+				},
 			},
 		},
 	}
@@ -151,6 +167,8 @@ func NewAuth(tokenType TokenType, cfg config.IJwtConfig, claims *users.UserClaim
 		return newRefreshToken(cfg, claims), nil
 	case Admin:
 		return newAdminToken(cfg, claims), nil
+	case RefreshTokenAdmin:
+		return newRefreshTokenAdmin(cfg, claims), nil
 	default:
 		return nil, fmt.Errorf("unknown token type")
 	}
@@ -164,7 +182,7 @@ func newAccessToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    "goEcommerce-api",
 				Subject:   "access-token",
-				Audience:  []string{"customer"},
+				Audience:  []string{"user"},
 				ExpiresAt: jwtTimeDurationCal(cfg.AccessExpiresAt()),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -181,7 +199,7 @@ func newRefreshToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    "goEcommerce-api",
 				Subject:   "refresh-token",
-				Audience:  []string{"customer", "admin"},
+				Audience:  []string{"user"},
 				ExpiresAt: jwtTimeDurationCal(cfg.RefreshExpiresAt()),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -190,9 +208,28 @@ func newRefreshToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
 	}
 }
 
-func newAdminToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
+func newRefreshTokenAdmin(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
 	return &authAdmin{
 		&Auth{
+			cfg: cfg,
+			mapClaims: &MapClaims{
+				Claims: claims,
+				RegisteredClaims: jwt.RegisteredClaims{
+					Issuer:    "goEcommerce-api",
+					Subject:   "refresh-token",
+					Audience:  []string{"admin"},
+					ExpiresAt: jwtTimeDurationCal(cfg.RefreshExpiresAt()),
+					NotBefore: jwt.NewNumericDate(time.Now()),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+				},
+			},
+		},
+	}
+}
+
+func newAdminToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
+	return &authAdmin{
+		Auth: &Auth{
 			cfg: cfg,
 			mapClaims: &MapClaims{
 				Claims: claims,

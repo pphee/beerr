@@ -143,6 +143,18 @@ func StoreMongo(t *testing.T, repo BeerRepository) {
 		require.NoError(t, err)
 	})
 
+	t.Run("UpdateBeer with image nil", func(t *testing.T) {
+		updatedBeer := model.Beer{
+			ID:       testBeer.ID,
+			Name:     "leo",
+			Category: "IPA",
+			Detail:   "Updated details",
+			Image:    nil,
+		}
+		err := repo.UpdateBeer(context.Background(), testBeer.ID, updatedBeer)
+		require.NoError(t, err)
+	})
+
 	t.Run("UpdateBeer with error", func(t *testing.T) {
 		err := repo.UpdateBeer(context.Background(), primitive.NilObjectID, testBeer)
 		require.Error(t, err)

@@ -16,6 +16,8 @@ type IUsersUsecase interface {
 	GetUserProfile(userId string) (*users.User, error)
 	InsertAdmin(req *users.UserRegisterReq) (*users.UserPassport, error)
 	RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error)
+	GetAllUserProfile() ([]*users.User, error)
+	UpdateRole(userId string, roleId int) error
 }
 
 type usersUsecase struct {
@@ -31,11 +33,9 @@ func UsersUsecase(cfg config.IConfig, userRepository usersRepositories.UserRepos
 }
 
 func (u *usersUsecase) InsertCustomer(req *users.UserRegisterReq) (*users.UserPassport, error) {
-	// Hashing a password
 	if err := req.BcryptHashing(); err != nil {
 		return nil, err
 	}
-	// Insert user
 	result, err := u.userRepository.InsertUser(req, false)
 	if err != nil {
 		return nil, err
@@ -45,11 +45,9 @@ func (u *usersUsecase) InsertCustomer(req *users.UserRegisterReq) (*users.UserPa
 }
 
 func (u *usersUsecase) InsertAdmin(req *users.UserRegisterReq) (*users.UserPassport, error) {
-	// Hashing a password
 	if err := req.BcryptHashing(); err != nil {
 		return nil, err
 	}
-	// Insert user
 	result, err := u.userRepository.InsertUser(req, true)
 	if err != nil {
 		return nil, err
@@ -59,13 +57,11 @@ func (u *usersUsecase) InsertAdmin(req *users.UserRegisterReq) (*users.UserPassp
 }
 
 func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPassport, error) {
-	// Find user
 	user, err := u.userRepository.FindOneUserByEmail(req.Email)
 	if err != nil {
 		return nil, err
 	}
 
-	// Compare password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, fmt.Errorf("password is invalid")
 	}
@@ -79,10 +75,6 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 		tokenType = auth.Access
 	}
 
-	fmt.Println("tokenType", tokenType)
-	fmt.Println("user", user.RoleId)
-
-	// Sign token based on the user role
 	token, err := auth.NewAuth(tokenType, u.cfg.Jwt(), &users.UserClaims{
 		Id:     user.Id,
 		RoleId: user.RoleId,
@@ -91,34 +83,61 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 		return nil, err
 	}
 
-	// Sign refresh token
-	refreshToken, err := auth.NewAuth(auth.Refresh, u.cfg.Jwt(), &users.UserClaims{
-		Id:     user.Id,
-		RoleId: user.RoleId,
-	})
-	if err != nil {
-		return nil, err
-	}
+	if tokenType == auth.Admin {
+		refreshTokenAdmin, err := auth.NewAuth(auth.RefreshTokenAdmin, u.cfg.Jwt(), &users.UserClaims{
+			Id:     user.Id,
+			RoleId: user.RoleId,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	// Set passport
-	passport := &users.UserPassport{
-		User: &users.User{
-			Id:       user.Id,
-			Email:    user.Email,
-			Username: user.Username,
-			RoleId:   user.RoleId,
-		},
-		Token: &users.UserToken{
-			AccessToken:  token.SignToken(), // This will be an admin token for admin users
-			RefreshToken: refreshToken.SignToken(),
-		},
-	}
+		passport := &users.UserPassport{
+			User: &users.User{
+				Id:       user.Id,
+				Email:    user.Email,
+				Username: user.Username,
+				RoleId:   user.RoleId,
+			},
+			Token: &users.UserToken{
+				AccessToken:  token.SignToken(),
+				RefreshToken: refreshTokenAdmin.SignToken(),
+			},
+		}
 
-	if err := u.userRepository.InsertOauth(passport); err != nil {
-		return nil, err
-	}
+		if err := u.userRepository.InsertOauth(passport); err != nil {
+			return nil, err
+		}
 
-	return passport, nil
+		return passport, nil
+	} else {
+		refreshToken, err := auth.NewAuth(auth.Refresh, u.cfg.Jwt(), &users.UserClaims{
+			Id:     user.Id,
+			RoleId: user.RoleId,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		passport := &users.UserPassport{
+			User: &users.User{
+				Id:       user.Id,
+				Email:    user.Email,
+				Username: user.Username,
+				RoleId:   user.RoleId,
+			},
+			Token: &users.UserToken{
+				AccessToken:  token.SignToken(),
+				RefreshToken: refreshToken.SignToken(),
+			},
+		}
+
+		if err := u.userRepository.InsertOauth(passport); err != nil {
+			return nil, err
+		}
+
+		return passport, nil
+	}
 }
 
 func (u *usersUsecase) RefreshPassport(req *users.UserRefreshCredential) (*users.UserPassport, error) {
@@ -128,13 +147,11 @@ func (u *usersUsecase) RefreshPassport(req *users.UserRefreshCredential) (*users
 		return nil, err
 	}
 
-	// Check oauth
 	oauth, err := u.userRepository.FindOneOauth(req.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
 
-	// Find profile
 	profile, err := u.userRepository.GetProfile(oauth.UserId)
 	if err != nil {
 		return nil, err
@@ -183,21 +200,15 @@ func (u *usersUsecase) RefreshPassportAdmin(req *users.UserRefreshCredential) (*
 		return nil, err
 	}
 
-	// Check oauth
 	oauth, err := u.userRepository.FindOneOauth(req.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("oauth", oauth)
-
-	// Find profile
 	profile, err := u.userRepository.GetProfile(oauth.UserId)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("profile", profile)
 
 	newClaims := &users.UserClaims{
 		Id:     profile.Id,
@@ -205,7 +216,7 @@ func (u *usersUsecase) RefreshPassportAdmin(req *users.UserRefreshCredential) (*
 	}
 
 	accessToken, err := auth.NewAuth(
-		auth.Access,
+		auth.Admin,
 		u.cfg.Jwt(),
 		newClaims,
 	)
@@ -213,7 +224,7 @@ func (u *usersUsecase) RefreshPassportAdmin(req *users.UserRefreshCredential) (*
 		return nil, err
 	}
 
-	refreshToken := auth.RepeatToken(
+	refreshTokenAdmin := auth.RepeatAdminToken(
 		u.cfg.Jwt(),
 		newClaims,
 		claims.ExpiresAt.Unix(),
@@ -224,7 +235,7 @@ func (u *usersUsecase) RefreshPassportAdmin(req *users.UserRefreshCredential) (*
 		Token: &users.UserToken{
 			Id:           oauth.Id,
 			AccessToken:  accessToken.SignToken(),
-			RefreshToken: refreshToken,
+			RefreshToken: refreshTokenAdmin,
 		},
 	}
 
@@ -240,4 +251,19 @@ func (u *usersUsecase) GetUserProfile(userId string) (*users.User, error) {
 		return nil, err
 	}
 	return profile, nil
+}
+
+func (u *usersUsecase) GetAllUserProfile() ([]*users.User, error) {
+	profile, err := u.userRepository.GetAllUserProfile()
+	if err != nil {
+		return nil, err
+	}
+	return profile, nil
+}
+
+func (u *usersUsecase) UpdateRole(userId string, roleId int) error {
+	if err := u.userRepository.UpdateRole(userId, roleId); err != nil {
+		return err
+	}
+	return nil
 }
