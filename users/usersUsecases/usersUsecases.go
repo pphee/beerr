@@ -18,6 +18,7 @@ type IUsersUsecase interface {
 	RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error)
 	GetAllUserProfile() ([]*users.User, error)
 	UpdateRole(userId string, roleId int) error
+	CreateRole(roleId, role string) error
 }
 
 type usersUsecase struct {
@@ -263,6 +264,13 @@ func (u *usersUsecase) GetAllUserProfile() ([]*users.User, error) {
 
 func (u *usersUsecase) UpdateRole(userId string, roleId int) error {
 	if err := u.userRepository.UpdateRole(userId, roleId); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *usersUsecase) CreateRole(roleId, role string) error {
+	if err := u.userRepository.CreateRole(roleId, role); err != nil {
 		return err
 	}
 	return nil

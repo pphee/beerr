@@ -9,3 +9,5 @@ type JwtAuthConfig struct {
 	AllowCustomer bool
 	AllowAdmin    bool
 }
+
+type UsersRole string

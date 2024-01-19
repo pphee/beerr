@@ -39,6 +39,7 @@ func LoadConfig(path string) IConfig {
 			userscollection:    envMap["USERS_COLLECTION"],
 			productscollection: envMap["PRODUCTS_COLLECTION"],
 			signinscollection:  envMap["USERS_SIGNIN_COLLECTION"],
+			rolescollection:    envMap["ROLES_COLLECTION"],
 		},
 		jwt: &jwt{
 			adminKey:         envMap["JWT_ADMIN_KEY"],
@@ -74,6 +75,7 @@ type db struct {
 	userscollection    string
 	productscollection string
 	signinscollection  string
+	rolescollection    string
 }
 
 type jwt struct {
@@ -110,6 +112,7 @@ type IDbConfig interface {
 	UsersCollection() string
 	ProductsCollection() string
 	SigninsCollection() string
+	RolesCollection() string
 }
 
 func (d *db) Url() string {
@@ -130,6 +133,10 @@ func (d *db) ProductsCollection() string {
 
 func (d *db) SigninsCollection() string {
 	return d.signinscollection
+}
+
+func (d *db) RolesCollection() string {
+	return d.rolescollection
 }
 
 func (c *config) Jwt() IJwtConfig {

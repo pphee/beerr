@@ -45,7 +45,7 @@ func (r *middlewaresRepository) FindAccessToken(userId, accessToken string) bool
 }
 
 func (r *middlewaresRepository) FindRole() ([]*middlewares.Role, error) {
-	cursor, err := r.db.Collection(r.cfg.Db().SigninsCollection()).Find(context.Background(), bson.D{})
+	cursor, err := r.db.Collection(r.cfg.Db().RolesCollection()).Find(context.Background(), bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("roles are empty")
 	}

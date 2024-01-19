@@ -17,6 +17,16 @@ type mockRepository struct {
 	mock.Mock
 }
 
+func (m *mockRepository) UpdateRole(userId string, roleId int) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockRepository) CreateRole(roleId, role string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *mockRepository) GetAllUserProfile() ([]*users.User, error) {
 	//TODO implement me
 	panic("implement me")

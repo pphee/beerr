@@ -40,7 +40,6 @@ func (s *server) Start(ctx context.Context) error {
 	config.AllowCredentials = true
 	config.AddAllowHeaders("Authorization", "access-control-allow-origin")
 	s.app.Use(cors.New(config))
-	//s.app.Use(middlewares.Cors())
 	api := s.app.Group("/api")
 	modules := InitModule(api, s, middlewares)
 	modules.UsersModule()

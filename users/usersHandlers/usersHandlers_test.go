@@ -20,6 +20,21 @@ type mockUsecases struct {
 	mock.Mock
 }
 
+func (m *mockUsecases) CreateRole(roleId, role string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockUsecases) GetAllUserProfile() ([]*users.User, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockUsecases) UpdateRole(userId string, roleId int) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *mockUsecases) RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error) {
 	//TODO implement me
 	panic("implement me")

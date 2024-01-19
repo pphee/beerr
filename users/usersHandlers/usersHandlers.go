@@ -23,6 +23,7 @@ type IUserHandler interface {
 	RefreshPassportAdmin(c *gin.Context)
 	GetAllUserProfile(c *gin.Context)
 	UpdateRole(c *gin.Context)
+	CreateRole(c *gin.Context)
 }
 
 type usersHandler struct {
@@ -48,22 +49,22 @@ func (h *usersHandler) SignUpCustomer(c *gin.Context) {
 		return
 	}
 
-	// Email validation
-	//if !req.IsEmail() {
-	//	c.JSON(http.StatusBadRequest, gin.H{
-	//		"error":   "Invalid email format",
-	//		"message": "email pattern is invalid",
-	//	})
-	//	return
-	//}
-
-	if !req.IsPassword() {
+	//Email validation
+	if !req.IsEmail() {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid password format",
-			"message": "password pattern is invalid",
+			"error":   "Invalid email format",
+			"message": "email pattern is invalid",
 		})
 		return
 	}
+
+	//if !req.IsPassword() {
+	//	c.JSON(http.StatusBadRequest, gin.H{
+	//		"error":   "Invalid password format",
+	//		"message": "password pattern is invalid",
+	//	})
+	//	return
+	//}
 
 	// Insert
 	result, err := h.usersUsecase.InsertCustomer(req)
@@ -261,5 +262,26 @@ func (h *usersHandler) UpdateRole(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Update role successfully",
+	})
+}
+
+func (h *usersHandler) CreateRole(c *gin.Context) {
+	var req users.RoleCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	if err := h.usersUsecase.CreateRole(req.RoleID, req.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Create role successfully",
 	})
 }

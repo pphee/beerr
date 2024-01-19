@@ -24,6 +24,7 @@ type UserRepository interface {
 	CheckUserExistence(email, username string) error
 	GetAllUserProfile() ([]*users.User, error)
 	UpdateRole(userId string, roleId int) error
+	CreateRole(roleId, role string) error
 }
 
 type usersRepository struct {
@@ -267,6 +268,25 @@ func (r *usersRepository) UpdateRole(userId string, roleId int) error {
 	if result.MatchedCount == 0 {
 		return fmt.Errorf("update user role failed: no document found with the given ID")
 	}
+
+	return nil
+}
+
+func (r *usersRepository) CreateRole(roleId, role string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	roleDoc := bson.M{
+		"roleId": roleId,
+		"role":   role,
+	}
+
+	result, err := r.db.Collection(r.cfg.Db().RolesCollection()).InsertOne(ctx, roleDoc)
+	if err != nil {
+		return fmt.Errorf("create role ID failed: %v", err)
+	}
+
+	fmt.Println("result", result)
 
 	return nil
 }

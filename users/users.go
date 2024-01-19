@@ -111,3 +111,8 @@ func NewHTTPError(statusCode int, message string) *HTTPError {
 type RoleUpdateRequest struct {
 	RoleID string `json:"role_id"`
 }
+
+type RoleCreateRequest struct {
+	RoleID string `json:"role_id"`
+	Role   string `json:"role"`
+}
