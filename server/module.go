@@ -77,7 +77,7 @@ func (m *moduleFactory) ProductsModule() {
 	//executiveRole := 128 // binary "10000000"
 
 	beersGroup.POST("/create", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.CreateBeer)
-	beersGroup.GET("/get/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.GetBeer)
+	beersGroup.GET("/get/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(1, 2, 4, 8), productHandler.GetBeer)
 	beersGroup.PATCH("/update/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.UpdateBeer)
 	beersGroup.DELETE("/delete/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.DeleteBeer)
 	beersGroup.GET("/filter-and-paginate", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(1, 2, 4, 8), productHandler.FilterAndPaginateBeers)

@@ -35,7 +35,7 @@ func (r *middlewaresRepository) FindAccessToken(userId, accessToken string) bool
 	}
 
 	filter := bson.M{"user_id": objId, "access_token": accessToken}
-	count, err := r.db.Collection(r.cfg.Db().SigninsCollection()).CountDocuments(context.Background(), filter)
+	count, err := r.db.Collection(r.cfg.Db().SignInsCollection()).CountDocuments(context.Background(), filter)
 	if err != nil {
 		fmt.Println("Error counting documents:", err)
 		return false

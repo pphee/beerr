@@ -116,7 +116,7 @@ func (r *usersRepository) InsertOauth(req *users.UserPassport) error {
 		"updated_at":    time.Now(),
 	}
 
-	result, err := r.db.Collection(r.cfg.Db().SigninsCollection()).InsertOne(ctx, oauthDocument)
+	result, err := r.db.Collection(r.cfg.Db().SignInsCollection()).InsertOne(ctx, oauthDocument)
 	if err != nil {
 		return fmt.Errorf("insert oauth failed: %v", err)
 	}
@@ -137,7 +137,7 @@ func (r *usersRepository) FindOneOauth(refreshToken string) (*users.Oauth, error
 	var mongoPassport users.MongoPassport
 	filter := bson.M{"refresh_token": refreshToken}
 
-	err := r.db.Collection(r.cfg.Db().SigninsCollection()).FindOne(ctx, filter).Decode(&mongoPassport)
+	err := r.db.Collection(r.cfg.Db().SignInsCollection()).FindOne(ctx, filter).Decode(&mongoPassport)
 	if err != nil {
 		fmt.Println("Error:", err)
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -203,7 +203,7 @@ func (r *usersRepository) UpdateOauth(req *users.UserToken) error {
 		},
 	}
 
-	result, err := r.db.Collection(r.cfg.Db().SigninsCollection()).UpdateOne(ctx, filter, update)
+	result, err := r.db.Collection(r.cfg.Db().SignInsCollection()).UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("update oauth failed: %v", err)
 	}

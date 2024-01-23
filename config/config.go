@@ -34,12 +34,12 @@ func LoadConfig(path string) IConfig {
 			name: envMap["APP_NAME"],
 		},
 		db: &db{
-			mongodburi:         envMap["MONGODB_URI"],
-			mongodbname:        envMap["MONGODB_DB_NAME"],
-			userscollection:    envMap["USERS_COLLECTION"],
-			productscollection: envMap["PRODUCTS_COLLECTION"],
-			signinscollection:  envMap["USERS_SIGNIN_COLLECTION"],
-			rolescollection:    envMap["ROLES_COLLECTION"],
+			mongodbUri:         envMap["MONGODB_URI"],
+			mongodbName:        envMap["MONGODB_DB_NAME"],
+			usersCollection:    envMap["USERS_COLLECTION"],
+			productsCollection: envMap["PRODUCTS_COLLECTION"],
+			signInsCollection:  envMap["USERS_SIGNIN_COLLECTION"],
+			rolesCollection:    envMap["ROLES_COLLECTION"],
 		},
 		jwt: &jwt{
 			adminKey:         envMap["JWT_ADMIN_KEY"],
@@ -70,12 +70,12 @@ type app struct {
 }
 
 type db struct {
-	mongodburi         string
-	mongodbname        string
-	userscollection    string
-	productscollection string
-	signinscollection  string
-	rolescollection    string
+	mongodbUri         string
+	mongodbName        string
+	usersCollection    string
+	productsCollection string
+	signInsCollection  string
+	rolesCollection    string
 }
 
 type jwt struct {
@@ -111,32 +111,32 @@ type IDbConfig interface {
 	Name() string
 	UsersCollection() string
 	ProductsCollection() string
-	SigninsCollection() string
+	SignInsCollection() string
 	RolesCollection() string
 }
 
 func (d *db) Url() string {
-	return d.mongodburi
+	return d.mongodbUri
 }
 
 func (d *db) Name() string {
-	return d.mongodbname
+	return d.mongodbName
 }
 
 func (d *db) UsersCollection() string {
-	return d.userscollection
+	return d.usersCollection
 }
 
 func (d *db) ProductsCollection() string {
-	return d.productscollection
+	return d.productsCollection
 }
 
-func (d *db) SigninsCollection() string {
-	return d.signinscollection
+func (d *db) SignInsCollection() string {
+	return d.signInsCollection
 }
 
 func (d *db) RolesCollection() string {
-	return d.rolescollection
+	return d.rolesCollection
 }
 
 func (c *config) Jwt() IJwtConfig {

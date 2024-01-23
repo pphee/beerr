@@ -24,10 +24,9 @@ func main() {
 
 	mongoDatabase, err := databases.ConnectMongoDB(cfg.Db())
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 
-	// Assuming the mongoDatabase object has a method to return the client
 	mongoClient := mongoDatabase.Client()
 
 	defer func() {
