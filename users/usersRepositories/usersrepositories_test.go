@@ -78,6 +78,7 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 			Id:       userID,
 			Email:    "pheeDan@gmail.com",
 			Username: "testuser",
+			Role:     "user",
 			RoleId:   1,
 		},
 		Token: &users.UserToken{
@@ -223,7 +224,7 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 			profileIDs = append(profileIDs, profile.Id.Hex())
 		}
 
-		err = repo.UpdateRole(profileIDs[0], newRoleId)
+		err = repo.UpdateRole(profileIDs[0], newRoleId, "manager")
 		if err != nil {
 			t.Errorf("Failed to update user role: %v", err)
 			return
@@ -242,7 +243,7 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 
 	// Step 5: Test error handling
 	t.Run("UpdateRoleWithInvalidID", func(t *testing.T) {
-		err := repo.UpdateRole("invalidID", newRoleId)
+		err := repo.UpdateRole("invalidID", newRoleId, "manager")
 		if err == nil {
 			t.Errorf("Expected error with invalid user ID, but got none")
 		}
@@ -250,7 +251,7 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 
 	t.Run("UpdateRoleWithNonExistingID", func(t *testing.T) {
 		nonExistingID := "5f50c31f5b5f5b5f5b5f5b5f" // Example non-existing ObjectID
-		err := repo.UpdateRole(nonExistingID, newRoleId)
+		err := repo.UpdateRole(nonExistingID, newRoleId, "manager")
 		if err == nil {
 			t.Errorf("Expected error with non-existing user ID, but got none")
 		}

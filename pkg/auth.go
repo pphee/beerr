@@ -182,7 +182,7 @@ func newAccessToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    "goEcommerce-api",
 				Subject:   "access-token",
-				Audience:  []string{"user"},
+				Audience:  []string{claims.Role},
 				ExpiresAt: jwtTimeDurationCal(cfg.AccessExpiresAt()),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -199,7 +199,7 @@ func newRefreshToken(cfg config.IJwtConfig, claims *users.UserClaims) IAuth {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    "goEcommerce-api",
 				Subject:   "refresh-token",
-				Audience:  []string{"user"},
+				Audience:  []string{claims.Role},
 				ExpiresAt: jwtTimeDurationCal(cfg.RefreshExpiresAt()),
 				NotBefore: jwt.NewNumericDate(time.Now()),
 				IssuedAt:  jwt.NewNumericDate(time.Now()),

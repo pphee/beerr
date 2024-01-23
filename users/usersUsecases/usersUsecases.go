@@ -17,7 +17,7 @@ type IUsersUsecase interface {
 	InsertAdmin(req *users.UserRegisterReq) (*users.UserPassport, error)
 	RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error)
 	GetAllUserProfile() ([]*users.User, error)
-	UpdateRole(userId string, roleId int) error
+	UpdateRole(userId string, roleId int, role string) error
 	CreateRole(roleId, role string) error
 }
 
@@ -78,6 +78,7 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 
 	token, err := auth.NewAuth(tokenType, u.cfg.Jwt(), &users.UserClaims{
 		Id:     user.Id,
+		Role:   user.Role,
 		RoleId: user.RoleId,
 	})
 	if err != nil {
@@ -87,6 +88,7 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 	if tokenType == auth.Admin {
 		refreshTokenAdmin, err := auth.NewAuth(auth.RefreshTokenAdmin, u.cfg.Jwt(), &users.UserClaims{
 			Id:     user.Id,
+			Role:   user.Role,
 			RoleId: user.RoleId,
 		})
 		if err != nil {
@@ -98,6 +100,7 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 				Id:       user.Id,
 				Email:    user.Email,
 				Username: user.Username,
+				Role:     user.Role,
 				RoleId:   user.RoleId,
 			},
 			Token: &users.UserToken{
@@ -114,6 +117,7 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 	} else {
 		refreshToken, err := auth.NewAuth(auth.Refresh, u.cfg.Jwt(), &users.UserClaims{
 			Id:     user.Id,
+			Role:   user.Role,
 			RoleId: user.RoleId,
 		})
 		if err != nil {
@@ -125,6 +129,7 @@ func (u *usersUsecase) GetPassport(req *users.UserCredential) (*users.UserPasspo
 				Id:       user.Id,
 				Email:    user.Email,
 				Username: user.Username,
+				Role:     user.Role,
 				RoleId:   user.RoleId,
 			},
 			Token: &users.UserToken{
@@ -160,6 +165,7 @@ func (u *usersUsecase) RefreshPassport(req *users.UserRefreshCredential) (*users
 
 	newClaims := &users.UserClaims{
 		Id:     profile.Id,
+		Role:   profile.Role,
 		RoleId: profile.RoleId,
 	}
 
@@ -213,6 +219,7 @@ func (u *usersUsecase) RefreshPassportAdmin(req *users.UserRefreshCredential) (*
 
 	newClaims := &users.UserClaims{
 		Id:     profile.Id,
+		Role:   profile.Role,
 		RoleId: profile.RoleId,
 	}
 
@@ -262,8 +269,8 @@ func (u *usersUsecase) GetAllUserProfile() ([]*users.User, error) {
 	return profile, nil
 }
 
-func (u *usersUsecase) UpdateRole(userId string, roleId int) error {
-	if err := u.userRepository.UpdateRole(userId, roleId); err != nil {
+func (u *usersUsecase) UpdateRole(userId string, roleId int, role string) error {
+	if err := u.userRepository.UpdateRole(userId, roleId, role); err != nil {
 		return err
 	}
 	return nil

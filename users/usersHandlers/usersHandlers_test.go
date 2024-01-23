@@ -30,8 +30,8 @@ func (m *mockUsecases) GetAllUserProfile() ([]*users.User, error) {
 	return args.Get(0).([]*users.User), args.Error(1)
 }
 
-func (m *mockUsecases) UpdateRole(userId string, roleId int) error {
-	args := m.Called(userId, roleId)
+func (m *mockUsecases) UpdateRole(userId string, roleId int, role string) error {
+	args := m.Called(userId, roleId, role)
 	return args.Error(0)
 }
 
@@ -128,6 +128,7 @@ func TestSignUpCustomer(t *testing.T) {
 				Id:       primitive.NewObjectID(),
 				Email:    testAdmin.Email,
 				Username: testAdmin.Username,
+				Role:     "admin",
 				RoleId:   2,
 			},
 		}, nil)
@@ -308,6 +309,7 @@ func TestSignUpCustomer(t *testing.T) {
 				Id:       someUserId,
 				Email:    "pok92deng@example.com",
 				Username: "pok92deng",
+				Role:     "user",
 				RoleId:   1,
 			},
 			Token: &users.UserToken{
@@ -407,6 +409,7 @@ func TestSignUpCustomer(t *testing.T) {
 			Id:       userID,
 			Email:    "user@example.com",
 			Username: "testuser",
+			Role:     "user",
 			RoleId:   1,
 		}
 
@@ -628,9 +631,9 @@ func TestSignUpCustomer(t *testing.T) {
 		r.PUT("/role/:user_id", handler.UpdateRole)
 
 		expectedError := errors.New("usecase error")
-		mockUsecases.On("UpdateRole", "1", 2).Return(expectedError).Once()
+		mockUsecases.On("UpdateRole", "1", 2, "admin").Return(expectedError).Once()
 
-		validReqBody := `{"role_id": "2"}`
+		validReqBody := `{"role_id": "2", "role": "admin"}`
 		req, _ := http.NewRequest(http.MethodPut, "/role/1", strings.NewReader(validReqBody))
 
 		w := httptest.NewRecorder()
@@ -648,9 +651,9 @@ func TestSignUpCustomer(t *testing.T) {
 		r := gin.Default()
 		r.PUT("/role/:user_id", handler.UpdateRole)
 
-		mockUsecases.On("UpdateRole", "1", 2).Return(nil).Once()
+		mockUsecases.On("UpdateRole", "1", 2, "admin").Return(nil).Once()
 
-		validReqBody := `{"role_id": "2"}`
+		validReqBody := `{"role_id": "2", "role": "admin"}`
 		req, _ := http.NewRequest(http.MethodPut, "/role/1", strings.NewReader(validReqBody))
 
 		w := httptest.NewRecorder()
@@ -710,6 +713,7 @@ func TestSignUpCustomer(t *testing.T) {
 			Id:       primitive.NewObjectID(),
 			Email:    "example@email.com",
 			Username: "exampleUser",
+			Role:     "user",
 			RoleId:   1,
 		}
 		exampleToken := &users.UserToken{

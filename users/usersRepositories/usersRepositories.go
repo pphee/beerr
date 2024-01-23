@@ -23,7 +23,7 @@ type UserRepository interface {
 	UpdateOauth(req *users.UserToken) error
 	CheckUserExistence(email, username string) error
 	GetAllUserProfile() ([]*users.User, error)
-	UpdateRole(userId string, roleId int) error
+	UpdateRole(userId string, roleId int, role string) error
 	CreateRole(roleId, role string) error
 }
 
@@ -242,7 +242,7 @@ func (r *usersRepository) GetAllUserProfile() ([]*users.User, error) {
 	return profiles, nil
 }
 
-func (r *usersRepository) UpdateRole(userId string, roleId int) error {
+func (r *usersRepository) UpdateRole(userId string, roleId int, role string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -255,6 +255,7 @@ func (r *usersRepository) UpdateRole(userId string, roleId int) error {
 	update := bson.M{
 		"$set": bson.M{
 			"role_id": roleId,
+			"role":    role,
 		},
 	}
 

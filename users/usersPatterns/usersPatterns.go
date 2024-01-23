@@ -65,6 +65,7 @@ func (f *userReq) Customer() (IInsertUser, error) {
 		"email":    f.req.Email,
 		"password": f.req.Password,
 		"username": f.req.Username,
+		"role":     "user",
 		"role_id":  1,
 	}
 
@@ -85,6 +86,7 @@ func (f *userReq) Admin() (IInsertUser, error) {
 		"email":    f.req.Email,
 		"password": f.req.Password,
 		"username": f.req.Username,
+		"role":     "admin",
 		"role_id":  2,
 	}
 

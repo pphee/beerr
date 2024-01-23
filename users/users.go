@@ -11,6 +11,7 @@ type User struct {
 	Id       primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Email    string             `bson:"email" json:"email"`
 	Username string             `bson:"username" json:"username"`
+	Role     string             `bson:"role" json:"role"`
 	RoleId   int                `bson:"role_id" json:"role_id"` // Ensure this is an integer.
 }
 
@@ -74,6 +75,7 @@ type UserCredentialCheck struct {
 	Email    string             `bson:"email" json:"email"`
 	Password string             `bson:"password" json:"password"`
 	Username string             `bson:"username" json:"username"`
+	Role     string             `bson:"role" json:"role"`
 	RoleId   int                `bson:"role_id" json:"role_id"`
 }
 
@@ -110,6 +112,7 @@ func NewHTTPError(statusCode int, message string) *HTTPError {
 }
 
 type RoleUpdateRequest struct {
+	Role   string `json:"role"`
 	RoleID string `json:"role_id"`
 }
 

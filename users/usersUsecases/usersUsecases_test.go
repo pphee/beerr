@@ -17,8 +17,8 @@ type mockRepository struct {
 	mock.Mock
 }
 
-func (m *mockRepository) UpdateRole(userId string, roleId int) error {
-	args := m.Called(userId, roleId)
+func (m *mockRepository) UpdateRole(userId string, roleId int, role string) error {
+	args := m.Called(userId, roleId, role)
 	return args.Error(0)
 }
 
@@ -81,12 +81,6 @@ func (m *mockRepository) NewAuth(cfg config.IConfig, userClaims *users.UserClaim
 func makeConfig() config.IConfig {
 	cfg := config.LoadConfig("/Users/p/Goland/pok92deng/.env")
 	return cfg
-}
-
-type MockAuth struct{}
-
-func (m MockAuth) SignToken() string {
-	return ""
 }
 
 func TestUsersUsecases(t *testing.T) {
@@ -155,6 +149,7 @@ func TestUsersUsecases(t *testing.T) {
 			Email:    testUser.Email,
 			Username: testUser.Username,
 			Password: string(hashedPassword),
+			Role:     "user",
 			RoleId:   1,
 		}
 
@@ -167,6 +162,7 @@ func TestUsersUsecases(t *testing.T) {
 			Email:    testAdmin.Email,
 			Username: testAdmin.Username,
 			Password: string(hashedAdminPassword),
+			Role:     "admin",
 			RoleId:   2,
 		}
 
@@ -220,6 +216,7 @@ func TestUsersUsecases(t *testing.T) {
 			Email:    testUser.Email,
 			Username: testUser.Username,
 			Password: string(hashedPassword),
+			Role:     "user",
 			RoleId:   1,
 		}
 
@@ -243,6 +240,7 @@ func TestUsersUsecases(t *testing.T) {
 			Email:    testUser.Email,
 			Username: testUser.Username,
 			Password: string(hashedPassword),
+			Role:     "user",
 			RoleId:   1,
 		}
 
@@ -264,6 +262,7 @@ func TestUsersUsecases(t *testing.T) {
 
 		userClaims := &users.UserClaims{
 			Id:     someUserId,
+			Role:   "user",
 			RoleId: 1,
 		}
 
@@ -282,6 +281,7 @@ func TestUsersUsecases(t *testing.T) {
 			Id:       someUserId,
 			Email:    "phee@gmail.com",
 			Username: "phee",
+			Role:     "user",
 			RoleId:   1,
 		}
 
@@ -328,6 +328,7 @@ func TestUsersUsecases(t *testing.T) {
 			cfg.Jwt(),
 			&users.UserClaims{
 				Id:     primitive.NewObjectID(),
+				Role:   "user",
 				RoleId: 1,
 			},
 		)
@@ -354,6 +355,7 @@ func TestUsersUsecases(t *testing.T) {
 			cfg.Jwt(),
 			&users.UserClaims{
 				Id:     primitive.NewObjectID(),
+				Role:   "user",
 				RoleId: 1,
 			},
 		)
@@ -367,6 +369,7 @@ func TestUsersUsecases(t *testing.T) {
 			Id:       primitive.NewObjectID(),
 			Email:    "phee@gmail.com",
 			Username: "phee",
+			Role:     "admin",
 			RoleId:   2,
 		}
 
@@ -387,6 +390,7 @@ func TestUsersUsecases(t *testing.T) {
 
 		userClaims := &users.UserClaims{
 			Id:     someUserId,
+			Role:   "admin",
 			RoleId: 2,
 		}
 
@@ -405,6 +409,7 @@ func TestUsersUsecases(t *testing.T) {
 			Id:       someUserId,
 			Email:    "phee@gmail.com",
 			Username: "phee",
+			Role:     "admin",
 			RoleId:   2,
 		}
 
@@ -431,6 +436,7 @@ func TestUsersUsecases(t *testing.T) {
 			cfg.Jwt(),
 			&users.UserClaims{
 				Id:     primitive.NewObjectID(),
+				Role:   "admin",
 				RoleId: 2,
 			},
 		)
@@ -452,6 +458,7 @@ func TestUsersUsecases(t *testing.T) {
 			cfg.Jwt(),
 			&users.UserClaims{
 				Id:     primitive.NewObjectID(),
+				Role:   "admin",
 				RoleId: 2,
 			},
 		)
@@ -491,6 +498,7 @@ func TestUsersUsecases(t *testing.T) {
 			Id:       primitive.NewObjectID(),
 			Email:    "phee@gmail.com",
 			Username: "phee",
+			Role:     "admin",
 			RoleId:   2,
 		}
 
@@ -603,9 +611,9 @@ func TestUsersUsecases(t *testing.T) {
 		mockRepo := new(mockRepository)
 		usersUsecase := UsersUsecase(cfg, mockRepo)
 
-		mockRepo.On("UpdateRole", testUser.Email, 1).Return(nil)
+		mockRepo.On("UpdateRole", testUser.Email, 1, "user").Return(nil)
 
-		err := usersUsecase.UpdateRole(testUser.Email, 1)
+		err := usersUsecase.UpdateRole(testUser.Email, 1, "user")
 		if err != nil {
 			t.Error(err)
 		}

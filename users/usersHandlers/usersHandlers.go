@@ -233,34 +233,41 @@ func (h *usersHandler) GetAllUserProfile(c *gin.Context) {
 }
 
 func (h *usersHandler) UpdateRole(c *gin.Context) {
-	userId := strings.Trim(c.Param("user_id"), " ")
+	userId := strings.TrimSpace(c.Param("user_id"))
+
+	if userId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
 
 	var req users.RoleUpdateRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	if req.RoleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role ID is required"})
 		return
 	}
 
 	roleId, err := strconv.Atoi(req.RoleID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid role ID",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
 		return
 	}
 
-	if err := h.usersUsecase.UpdateRole(userId, roleId); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+	if req.Role == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role is required"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Update role successfully",
-	})
+	if err := h.usersUsecase.UpdateRole(userId, roleId, req.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Update role successfully"})
 }
 
 func (h *usersHandler) CreateRole(c *gin.Context) {
