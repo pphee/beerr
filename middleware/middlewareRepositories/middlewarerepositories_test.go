@@ -59,6 +59,8 @@ func TestNewMongoDB(t *testing.T) {
 }
 
 func StoreMongo(t *testing.T, repo IMiddlewaresRepository, database *mongo.Database, cfg config.IConfig) {
+	ctx := context.Background()
+	collectionName := cfg.Db().RolesCollection()
 	t.Run("FindAccessToken", func(t *testing.T) {
 		userId := primitive.NewObjectID() // Use ObjectID directly
 		accessToken := "someAccessToken"
@@ -84,10 +86,25 @@ func StoreMongo(t *testing.T, repo IMiddlewaresRepository, database *mongo.Datab
 		assert.False(t, result, "Expected false when userId cannot be converted to ObjectId")
 	})
 
-	t.Run("FindRole", func(t *testing.T) {
-		result, err := repo.FindRole()
+	t.Run("ValidRoleId", func(t *testing.T) {
+
+		_, err := database.Collection(collectionName).InsertOne(ctx, bson.M{
+			"roleId": "1",
+			"role":   "TestRole",
+		})
 		require.NoError(t, err)
-		assert.NotEmpty(t, result)
+
+		roles, err := repo.FindRole(ctx, "1")
+		require.NoError(t, err)
+		require.Len(t, roles, 1)
+	})
+
+	t.Run("InvalidRoleId", func(t *testing.T) {
+		invalidRoleId := "nonExistingRole"
+
+		roles, err := repo.FindRole(ctx, invalidRoleId)
+		require.NoError(t, err)
+		assert.Empty(t, roles)
 	})
 
 }

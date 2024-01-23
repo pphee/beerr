@@ -11,3 +11,8 @@ type JwtAuthConfig struct {
 }
 
 type UsersRole string
+
+type Roles struct {
+	RoleID string `json:"role_id"`
+	Role   string `json:"role"`
+}

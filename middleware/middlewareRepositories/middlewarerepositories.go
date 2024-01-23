@@ -12,7 +12,7 @@ import (
 
 type IMiddlewaresRepository interface {
 	FindAccessToken(userId, accessToken string) bool
-	FindRole() ([]*middlewares.Role, error)
+	FindRole(ctx context.Context, userRoleId string) ([]*middlewares.Roles, error)
 }
 
 type middlewaresRepository struct {
@@ -44,15 +44,22 @@ func (r *middlewaresRepository) FindAccessToken(userId, accessToken string) bool
 	return count > 0
 }
 
-func (r *middlewaresRepository) FindRole() ([]*middlewares.Role, error) {
-	cursor, err := r.db.Collection(r.cfg.Db().RolesCollection()).Find(context.Background(), bson.D{})
-	if err != nil {
-		return nil, fmt.Errorf("roles are empty")
+func (r *middlewaresRepository) FindRole(ctx context.Context, userRoleId string) ([]*middlewares.Roles, error) {
+	var filter bson.D
+	if userRoleId != "" {
+		filter = bson.D{{"roleId", userRoleId}}
 	}
 
-	var roles []*middlewares.Role
-	if err = cursor.All(context.Background(), &roles); err != nil {
-		return nil, err
+	cursor, err := r.db.Collection(r.cfg.Db().RolesCollection()).Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error querying roles: %v", err)
 	}
+	defer cursor.Close(ctx)
+
+	var roles []*middlewares.Roles
+	if err = cursor.All(ctx, &roles); err != nil {
+		return nil, fmt.Errorf("error decoding roles: %v", err)
+	}
+
 	return roles, nil
 }

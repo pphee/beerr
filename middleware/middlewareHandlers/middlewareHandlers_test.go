@@ -1,6 +1,7 @@
 package middlewaresHandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -20,14 +21,14 @@ type mockUsecase struct {
 	mock.Mock
 }
 
+func (m *mockUsecase) FindRole(ctx context.Context, userRoleId string) ([]*middlewares.Roles, error) {
+	args := m.Called(ctx, userRoleId)
+	return args.Get(0).([]*middlewares.Roles), args.Error(1)
+}
+
 func (m *mockUsecase) FindAccessToken(userId, accessToken string) bool {
 	args := m.Called(userId, accessToken)
 	return args.Bool(0)
-}
-
-func (m *mockUsecase) FindRole() ([]*middlewares.Role, error) {
-	args := m.Called()
-	return args.Get(0).([]*middlewares.Role), args.Error(1)
 }
 
 type MockAuth struct {

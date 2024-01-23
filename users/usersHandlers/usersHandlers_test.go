@@ -21,23 +21,23 @@ type mockUsecases struct {
 }
 
 func (m *mockUsecases) CreateRole(roleId, role string) error {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called(roleId, role)
+	return args.Error(0)
 }
 
 func (m *mockUsecases) GetAllUserProfile() ([]*users.User, error) {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called()
+	return args.Get(0).([]*users.User), args.Error(1)
 }
 
 func (m *mockUsecases) UpdateRole(userId string, roleId int) error {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called(userId, roleId)
+	return args.Error(0)
 }
 
 func (m *mockUsecases) RefreshPassportAdmin(req *users.UserRefreshCredential) (*users.UserPassport, error) {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called(req)
+	return args.Get(0).(*users.UserPassport), args.Error(1)
 }
 
 func (m *mockUsecases) InsertCustomer(req *users.UserRegisterReq) (*users.UserPassport, error) {
@@ -228,6 +228,26 @@ func TestSignUpCustomer(t *testing.T) {
 		r.ServeHTTP(resp, req)
 
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
+	})
+
+	t.Run("SignUpAdmin_UsecaseError", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+		r := gin.Default()
+		r.POST("/signup-admin", handler.SignUpAdmin)
+
+		mockError := &users.HTTPError{StatusCode: http.StatusInternalServerError, Message: "Internal Server Error"}
+		mockUsecases.On("InsertAdmin", mock.Anything).Return((*users.UserPassport)(nil), mockError).Once()
+
+		validReqBody := `{"email": "admin@example.com", "other_fields": "values"}`
+		req, _ := http.NewRequest(http.MethodPost, "/signup-admin", strings.NewReader(validReqBody))
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, mockError.StatusCode, w.Code)
+		assert.Contains(t, w.Body.String(), mockError.Message)
 	})
 
 	t.Run("Invalid JSON", func(t *testing.T) {
@@ -444,6 +464,273 @@ func TestSignUpCustomer(t *testing.T) {
 
 		assert.Equal(t, http.StatusInternalServerError, resp.Code)
 		mockUsecases.AssertCalled(t, "GetUserProfile", userID)
+	})
+
+	t.Run("GetAllUserProfile", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+		mockUsecases.On("GetAllUserProfile").Return([]*users.User{}, nil)
+
+		r := gin.Default()
+		r.GET("/users", handler.GetAllUserProfile)
+
+		req, _ := http.NewRequest(http.MethodGet, "/users", nil)
+		resp := httptest.NewRecorder()
+
+		r.ServeHTTP(resp, req)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+		mockUsecases.AssertCalled(t, "GetAllUserProfile")
+	})
+
+	t.Run("GetAllUserProfile_InternalServerError", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		// Set up the expected behavior of the mock
+		expectedError := errors.New("internal server error")
+		mockUsecases.On("GetAllUserProfile").Return([]*users.User{}, expectedError).Once()
+
+		r := gin.Default()
+		r.GET("/user/profiles", handler.GetAllUserProfile)
+
+		req, err := http.NewRequest(http.MethodGet, "/user/profiles", nil)
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code, "Expected status code to be 500 (Internal Server Error)")
+		assert.Contains(t, w.Body.String(), expectedError.Error(), "Expected error message in response")
+
+		mockUsecases.AssertExpectations(t)
+	})
+
+	t.Run("CreateRole", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		expectedError := errors.New("create role error")
+		mockUsecases.On("CreateRole", "1", "TestRole").Return(expectedError).Once()
+
+		r := gin.Default()
+		r.POST("/role", handler.CreateRole)
+
+		reqBody := `{"role_id":"1","role":"TestRole"}`
+		req, err := http.NewRequest(http.MethodPost, "/role", strings.NewReader(reqBody))
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code, "Expected internal server error")
+		assert.Contains(t, w.Body.String(), expectedError.Error(), "Expected error message in response")
+
+		mockUsecases.AssertExpectations(t)
+	})
+
+	t.Run("CreateRole_Success", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		mockUsecases.On("CreateRole", "1", "TestRole").Return(nil).Once()
+
+		r := gin.Default()
+		r.POST("/role", handler.CreateRole)
+
+		reqBody := `{"role_id":"1","role":"TestRole"}`
+		req, err := http.NewRequest(http.MethodPost, "/role", strings.NewReader(reqBody))
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusCreated, w.Code, "Expected status code to be 201 (Created)")
+		assert.Contains(t, w.Body.String(), "Create role successfully", "Expected success message in response")
+
+		mockUsecases.AssertExpectations(t)
+	})
+
+	t.Run("CreateRole_InvalidRequest", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		r := gin.Default()
+		r.POST("/role", handler.CreateRole)
+
+		invalidReqBody := `{"role_id": "1", "role":}`
+		req, err := http.NewRequest(http.MethodPost, "/role", strings.NewReader(invalidReqBody))
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "Expected status code to be 400 (Bad Request)")
+		assert.Contains(t, w.Body.String(), "Invalid request format", "Expected error message in response")
+
+	})
+
+	t.Run("UpdateRole_InvalidJSON", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		r := gin.Default()
+		r.PUT("/role/:user_id", handler.UpdateRole)
+
+		invalidReqBody := `{"role_id": "invalid_json}`
+		req, _ := http.NewRequest(http.MethodPut, "/role/1", strings.NewReader(invalidReqBody))
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid request format")
+	})
+
+	t.Run("UpdateRole_InvalidRoleID", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		r := gin.Default()
+		r.PUT("/role/:user_id", handler.UpdateRole)
+
+		invalidRoleIdReqBody := `{"role_id": "abc"}`
+		req, _ := http.NewRequest(http.MethodPut, "/role/1", strings.NewReader(invalidRoleIdReqBody))
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid role ID")
+	})
+
+	t.Run("UpdateRole_UsecaseFailure", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		r := gin.Default()
+		r.PUT("/role/:user_id", handler.UpdateRole)
+
+		expectedError := errors.New("usecase error")
+		mockUsecases.On("UpdateRole", "1", 2).Return(expectedError).Once()
+
+		validReqBody := `{"role_id": "2"}`
+		req, _ := http.NewRequest(http.MethodPut, "/role/1", strings.NewReader(validReqBody))
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Contains(t, w.Body.String(), expectedError.Error())
+	})
+
+	t.Run("UpdateRole_Success", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		r := gin.Default()
+		r.PUT("/role/:user_id", handler.UpdateRole)
+
+		mockUsecases.On("UpdateRole", "1", 2).Return(nil).Once()
+
+		validReqBody := `{"role_id": "2"}`
+		req, _ := http.NewRequest(http.MethodPut, "/role/1", strings.NewReader(validReqBody))
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "Update role successfully")
+	})
+
+	t.Run("RefreshPassportAdmin_InvalidJSON", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		router := gin.Default()
+		router.POST("/refreshPassportAdmin", handler.RefreshPassportAdmin)
+		invalidReqBody := `{"invalid_json"`
+		req, _ := http.NewRequest(http.MethodPost, "/refreshPassportAdmin", strings.NewReader(invalidReqBody))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid request format")
+	})
+
+	t.Run("RefreshPassportAdmin_UsecaseError", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		router := gin.Default()
+		router.POST("/refreshPassportAdmin", handler.RefreshPassportAdmin)
+
+		expectedError := errors.New("usecase error")
+		mockUsecases.On("RefreshPassportAdmin", mock.Anything).Return((*users.UserPassport)(nil), expectedError).Once()
+
+		validReqBody := `{"some_field": "some_value"}`
+		req, _ := http.NewRequest(http.MethodPost, "/refreshPassportAdmin", strings.NewReader(validReqBody))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Error refreshing passport")
+	})
+
+	t.Run("RefreshPassportAdmin_Success", func(t *testing.T) {
+		cfg := makeConfig()
+		mockUsecases := new(mockUsecases)
+		handler := UsersHandler(cfg, mockUsecases)
+
+		router := gin.Default()
+		router.POST("/refreshPassportAdmin", handler.RefreshPassportAdmin)
+
+		exampleUser := &users.User{
+			Id:       primitive.NewObjectID(),
+			Email:    "example@email.com",
+			Username: "exampleUser",
+			RoleId:   1,
+		}
+		exampleToken := &users.UserToken{
+			Id:           "tokenID",
+			AccessToken:  "access-token-string",
+			RefreshToken: "refresh-token-string",
+		}
+
+		mockPassport := &users.UserPassport{
+			User:  exampleUser,
+			Token: exampleToken,
+		}
+		mockUsecases.On("RefreshPassportAdmin", mock.Anything).Return(mockPassport, nil).Once()
+
+		validReqBody := `{"some_field": "some_value"}`
+		req, _ := http.NewRequest(http.MethodPost, "/refreshPassportAdmin", strings.NewReader(validReqBody))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
 }

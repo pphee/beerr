@@ -191,8 +191,6 @@ func (r *usersRepository) UpdateOauth(req *users.UserToken) error {
 	defer cancel()
 	objID, err := primitive.ObjectIDFromHex(req.Id)
 
-	fmt.Println("objID", objID)
-
 	if err != nil {
 		return fmt.Errorf("invalid ID format: %v", err)
 	}

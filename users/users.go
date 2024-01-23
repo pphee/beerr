@@ -59,7 +59,8 @@ func (obj *UserRegisterReq) IsPassword() bool {
 
 type UserClaims struct {
 	Id     primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	RoleId int                `bson:"role" json:"role"`
+	Role   string             `bson:"role" json:"role"`
+	RoleId int                `bson:"role_id" json:"role_id"`
 }
 
 type UserCredential struct {

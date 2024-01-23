@@ -9,6 +9,7 @@ import (
 	middlewaresUsecases "pok92deng/middleware/middlewareUsecases"
 	auth "pok92deng/pkg"
 	"pok92deng/utils"
+	"strconv"
 	"strings"
 )
 
@@ -73,25 +74,27 @@ func (h *middlewaresHandler) Authorize(expectRoleId ...int) gin.HandlerFunc {
 			return
 		}
 
-		roles, err := h.middlewaresUsecase.FindRole()
+		userRoleIdString := strconv.Itoa(userRoleIdInt)
+		roles, err := h.middlewaresUsecase.FindRole(c.Request.Context(), userRoleIdString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		if len(roles) == 0 {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Role list is empty"})
-			return
+		isOk := false
+		for _, roleId := range expectRoleId {
+			if roleExists(roleId, roles) {
+				isOk = true
+				break
+			}
 		}
 
-		fmt.Println("sumRoles(expectRoleId...)", sumRoles(expectRoleId...))
-		fmt.Println("userRoleIdInt", userRoleIdInt)
-
-		expectValueBinary := utils.BinaryConverter(sumRoles(expectRoleId...), len(roles))
-		userValueBinary := utils.BinaryConverter(userRoleIdInt, len(roles))
-
-		fmt.Println("expectValueBinary", expectValueBinary)
-		fmt.Println("userValueBinary", userValueBinary)
+		if !isOk {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "No required role found"})
+			return
+		}
+		expectValueBinary := utils.BinaryConverter(sumRoles(expectRoleId...), 10)
+		userValueBinary := utils.BinaryConverter(userRoleIdInt, 10)
 
 		for i := range userValueBinary {
 			if userValueBinary[i]&expectValueBinary[i] == 1 {
@@ -104,8 +107,26 @@ func (h *middlewaresHandler) Authorize(expectRoleId ...int) gin.HandlerFunc {
 	}
 }
 
+func roleExists(roleId int, roles []*middlewares.Roles) bool {
+	for _, role := range roles {
+		if role == nil {
+			continue
+		}
+		parsedRoleId, err := strconv.Atoi(role.RoleID)
+		if err != nil {
+			fmt.Println("Error parsing role ID:", role.RoleID, "Error:", err)
+			continue
+		}
+		if parsedRoleId == roleId {
+			return true
+		}
+
+	}
+	return false
+
+}
+
 func sumRoles(roles ...int) int {
-	fmt.Println("roles", roles)
 	sum := 0
 	for _, v := range roles {
 		sum += v

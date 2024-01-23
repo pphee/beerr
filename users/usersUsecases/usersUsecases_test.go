@@ -18,18 +18,18 @@ type mockRepository struct {
 }
 
 func (m *mockRepository) UpdateRole(userId string, roleId int) error {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called(userId, roleId)
+	return args.Error(0)
 }
 
 func (m *mockRepository) CreateRole(roleId, role string) error {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called(roleId, role)
+	return args.Error(0)
 }
 
 func (m *mockRepository) GetAllUserProfile() ([]*users.User, error) {
-	//TODO implement me
-	panic("implement me")
+	args := m.Called()
+	return args.Get(0).([]*users.User), args.Error(1)
 }
 
 func (m *mockRepository) InsertUser(req *users.UserRegisterReq, isAdmin bool) (*users.UserPassport, error) {
@@ -564,6 +564,64 @@ func TestUsersUsecases(t *testing.T) {
 			t.Errorf("Expected an error for password length exceeding 72 bytes, got none")
 		}
 		assert.Equal(t, "hashed password failed: bcrypt: password length exceeds 72 bytes", err.Error())
+	})
+
+	t.Run("GetAllUserProfile", func(t *testing.T) {
+		cfg := makeConfig()
+		mockRepo := new(mockRepository)
+		usersUsecase := UsersUsecase(cfg, mockRepo)
+
+		mockRepo.On("GetAllUserProfile").Return([]*users.User{}, nil)
+
+		_, err := usersUsecase.GetAllUserProfile()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("GetAllUserProfileError", func(t *testing.T) {
+		t.Run("GetAllUserProfileSuccess", func(t *testing.T) {
+			// Setting up the configuration and mock repository
+			cfg := makeConfig()
+			mockRepo := new(mockRepository)
+			usersUsecase := UsersUsecase(cfg, mockRepo)
+
+			mockRepo.On("GetAllUserProfile").Return([]*users.User{}, nil)
+
+			result, err := usersUsecase.GetAllUserProfile()
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.Len(t, result, 0)
+
+			mockRepo.AssertExpectations(t)
+		})
+	})
+
+	t.Run("UpdateRole", func(t *testing.T) {
+		cfg := makeConfig()
+		mockRepo := new(mockRepository)
+		usersUsecase := UsersUsecase(cfg, mockRepo)
+
+		mockRepo.On("UpdateRole", testUser.Email, 1).Return(nil)
+
+		err := usersUsecase.UpdateRole(testUser.Email, 1)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("CreateRole", func(t *testing.T) {
+		cfg := makeConfig()
+		mockRepo := new(mockRepository)
+		usersUsecase := UsersUsecase(cfg, mockRepo)
+
+		mockRepo.On("CreateRole", "1", "admin").Return(nil)
+
+		err := usersUsecase.CreateRole("1", "admin")
+		if err != nil {
+			t.Error(err)
+		}
 	})
 
 }

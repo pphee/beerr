@@ -50,14 +50,15 @@ func (m *moduleFactory) UsersModule() {
 	usersGroup.POST("/refresh", userHandler.RefreshPassport)
 	usersGroup.POST("/refresh-admin", userHandler.RefreshPassportAdmin)
 	usersGroup.POST("/signup-admin", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.SignUpAdmin)
-	//usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	usersGroup.POST("/signup-admin-no-middleware", userHandler.SignUpAdmin)
 	usersGroup.POST("/create-role", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.CreateRole)
 
 	usersGroup.GET("/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.ParamCheck(), userHandler.GerUserProfile)
 	usersGroup.GET("/get-all-user", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GetAllUserProfile)
 	usersGroup.PATCH("/update-role/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.UpdateRole)
-	usersGroup.GET("/admin/secret", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GenerateAdminToken)
+
+	//usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
+	//usersGroup.GET("/admin/secret", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GenerateAdminToken)
 }
 
 func (m *moduleFactory) ProductsModule() {
@@ -65,7 +66,6 @@ func (m *moduleFactory) ProductsModule() {
 	productUseCase := usecases.NewBeerService(productRepo)
 	productHandler := handlers.NewBeerHandlers(productUseCase)
 	beersGroup := m.r.Group("/beer")
-	//m.mid.AuthorizeString("admin", "user")
 
 	//userRole := 1      // binary "0001"
 	//adminRole := 2     // binary "0010"
@@ -80,5 +80,6 @@ func (m *moduleFactory) ProductsModule() {
 	beersGroup.GET("/get/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.GetBeer)
 	beersGroup.PATCH("/update/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.UpdateBeer)
 	beersGroup.DELETE("/delete/:id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2, 4, 8), productHandler.DeleteBeer)
-	beersGroup.GET("/filter-and-paginate", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), productHandler.FilterAndPaginateBeers)
+	beersGroup.GET("/filter-and-paginate", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(1, 2, 4, 8), productHandler.FilterAndPaginateBeers)
+	beersGroup.GET("/filter-and-paginate-no-middleware", productHandler.FilterAndPaginateBeers)
 }

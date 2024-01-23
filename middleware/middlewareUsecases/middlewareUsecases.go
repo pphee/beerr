@@ -1,13 +1,14 @@
 package middlewaresUsecases
 
 import (
+	"context"
 	middlewares "pok92deng/middleware"
 	middlewaresRepositories "pok92deng/middleware/middlewareRepositories"
 )
 
 type IMiddlewaresUsecase interface {
 	FindAccessToken(userId, accessToken string) bool
-	FindRole() ([]*middlewares.Role, error)
+	FindRole(ctx context.Context, userRoleId string) ([]*middlewares.Roles, error)
 }
 
 type middlewaresUsecase struct {
@@ -24,8 +25,8 @@ func (u *middlewaresUsecase) FindAccessToken(userId, accessToken string) bool {
 	return u.middlewaresRepository.FindAccessToken(userId, accessToken)
 }
 
-func (u *middlewaresUsecase) FindRole() ([]*middlewares.Role, error) {
-	roles, err := u.middlewaresRepository.FindRole()
+func (u *middlewaresUsecase) FindRole(ctx context.Context, userRoleId string) ([]*middlewares.Roles, error) {
+	roles, err := u.middlewaresRepository.FindRole(ctx, userRoleId)
 	if err != nil {
 		return nil, err
 	}

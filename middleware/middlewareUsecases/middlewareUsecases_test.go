@@ -1,9 +1,11 @@
 package middlewaresUsecases
 
 import (
+	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	middlewares "pok92deng/middleware"
 	"testing"
 )
@@ -17,9 +19,9 @@ func (m *mockRepository) FindAccessToken(userId, accessToken string) bool {
 	return args.Bool(0)
 }
 
-func (m *mockRepository) FindRole() ([]*middlewares.Role, error) {
-	args := m.Called()
-	return args.Get(0).([]*middlewares.Role), args.Error(1)
+func (m *mockRepository) FindRole(ctx context.Context, userRoleId string) ([]*middlewares.Roles, error) {
+	args := m.Called(ctx, userRoleId)
+	return args.Get(0).([]*middlewares.Roles), args.Error(1)
 }
 
 func TestMiddlewaresRepository(t *testing.T) {
@@ -33,19 +35,25 @@ func TestMiddlewaresRepository(t *testing.T) {
 	})
 
 	t.Run("FindRole_Success", func(t *testing.T) {
-		mockRepo.On("FindRole").Return([]*middlewares.Role{}, nil).Once()
-		result, err := useCase.FindRole()
-		assert.Equal(t, []*middlewares.Role{}, result)
-		assert.Nil(t, err)
-		mockRepo.AssertExpectations(t)
+		ctx := context.Background()
+		testRole := &middlewares.Roles{RoleID: "1", Role: "TestRole"}
+		mockRepo.On("FindRole", ctx, "1").Return([]*middlewares.Roles{testRole}, nil)
+
+		result, err := useCase.FindRole(ctx, "1")
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, "1", result[0].RoleID)
+		assert.Equal(t, "TestRole", result[0].Role)
 	})
 
 	t.Run("FindRole_Error", func(t *testing.T) {
 		expectedError := errors.New("find role error")
-		mockRepo.On("FindRole").Return(([]*middlewares.Role)(nil), expectedError).Once()
-		result, err := useCase.FindRole()
+		ctx := context.Background()
+		mockRepo.On("FindRole", ctx, "userRoleId").Return([]*middlewares.Roles(nil), expectedError).Once()
+		result, err := useCase.FindRole(ctx, "userRoleId")
 		assert.Nil(t, result)
 		assert.Equal(t, expectedError, err)
 		mockRepo.AssertExpectations(t)
 	})
+
 }

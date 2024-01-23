@@ -2,6 +2,7 @@ package usersRepositories
 
 import (
 	"context"
+	"fmt"
 	"github.com/tryvium-travels/memongo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"pok92deng/config"
 	"pok92deng/users"
+	"strconv"
 	"testing"
 )
 
@@ -85,6 +87,8 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 	}
 
 	var validUserID string
+
+	newRoleId := 4
 
 	t.Run("InsertUser", func(t *testing.T) {
 		user, err := repo.InsertUser(testUser, false)
@@ -188,6 +192,74 @@ func StoreMongo(t *testing.T, repo UserRepository) {
 			if err != nil {
 				t.Error(err)
 			}
+		}
+	})
+
+	t.Run("GetAllUserProfile", func(t *testing.T) {
+		profiles, err := repo.GetAllUserProfile()
+		if err != nil {
+			t.Errorf("Error fetching profiles: %v", err)
+		}
+
+		for _, profile := range profiles {
+			fmt.Println(profile)
+		}
+		if len(profiles) != 2 {
+			t.Errorf("Expected 2 profiles, got %d", len(profiles))
+		}
+	})
+
+	t.Run("UpdateRole", func(t *testing.T) {
+		// Fetch all user profiles
+		profiles, err := repo.GetAllUserProfile()
+		if err != nil {
+			t.Errorf("Error fetching profiles: %v", err)
+			return
+		}
+
+		var profileIDs []string
+
+		for _, profile := range profiles {
+			profileIDs = append(profileIDs, profile.Id.Hex())
+		}
+
+		err = repo.UpdateRole(profileIDs[0], newRoleId)
+		if err != nil {
+			t.Errorf("Failed to update user role: %v", err)
+			return
+		}
+
+		updatedUser, err := repo.GetProfile(profileIDs[0])
+		if err != nil {
+			t.Errorf("Failed to retrieve updated user: %v", err)
+			return
+		}
+
+		if updatedUser != nil && updatedUser.RoleId != newRoleId {
+			t.Errorf("Role ID was not updated correctly. Expected %d, got %d", newRoleId, updatedUser.RoleId)
+		}
+	})
+
+	// Step 5: Test error handling
+	t.Run("UpdateRoleWithInvalidID", func(t *testing.T) {
+		err := repo.UpdateRole("invalidID", newRoleId)
+		if err == nil {
+			t.Errorf("Expected error with invalid user ID, but got none")
+		}
+	})
+
+	t.Run("UpdateRoleWithNonExistingID", func(t *testing.T) {
+		nonExistingID := "5f50c31f5b5f5b5f5b5f5b5f" // Example non-existing ObjectID
+		err := repo.UpdateRole(nonExistingID, newRoleId)
+		if err == nil {
+			t.Errorf("Expected error with non-existing user ID, but got none")
+		}
+	})
+
+	t.Run("CreateRole", func(t *testing.T) {
+		err := repo.CreateRole(strconv.Itoa(newRoleId), "testRole")
+		if err != nil {
+			t.Error(err)
 		}
 	})
 

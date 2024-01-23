@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pok92deng/config"
-	auth "pok92deng/pkg"
 	"pok92deng/users"
 	"pok92deng/users/usersUsecases"
 	"strconv"
@@ -17,7 +16,6 @@ type IUserHandler interface {
 	SignUpCustomer(c *gin.Context)
 	SignIn(c *gin.Context)
 	RefreshPassport(c *gin.Context)
-	GenerateAdminToken(c *gin.Context)
 	GerUserProfile(c *gin.Context)
 	SignUpAdmin(c *gin.Context)
 	RefreshPassportAdmin(c *gin.Context)
@@ -170,20 +168,20 @@ func (h *usersHandler) SignUpAdmin(c *gin.Context) {
 	})
 }
 
-func (h *usersHandler) GenerateAdminToken(c *gin.Context) {
-	adminToken, err := auth.NewAuth(auth.Admin, h.cfg.Jwt(), nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"token": adminToken.SignToken(),
-	})
-}
+//func (h *usersHandler) GenerateAdminToken(c *gin.Context) {
+//	adminToken, err := auth.NewAuth(auth.Admin, h.cfg.Jwt(), nil)
+//	if err != nil {
+//		c.JSON(http.StatusInternalServerError, gin.H{
+//			"error":   "Internal Server Error",
+//			"message": err.Error(),
+//		})
+//		return
+//	}
+//
+//	c.JSON(http.StatusOK, gin.H{
+//		"token": adminToken.SignToken(),
+//	})
+//}
 
 func (h *usersHandler) RefreshPassportAdmin(c *gin.Context) {
 	req := new(users.UserRefreshCredential)

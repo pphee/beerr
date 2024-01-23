@@ -7,5 +7,6 @@ func BinaryConverter(number int, bits int) []int {
 		result[bits] = number % 2
 		number /= 2
 	}
+
 	return result
 }
