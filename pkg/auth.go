@@ -6,7 +6,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"math"
 	"pok92deng/config"
-	"pok92deng/users"
+	"pok92deng/module/users"
 	"time"
 )
 

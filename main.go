@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 	"pok92deng/config"
+	"pok92deng/module/server"
 	databases "pok92deng/pkg/database"
-	servers "pok92deng/server"
 )
 
 func envPath() string {

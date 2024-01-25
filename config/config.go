@@ -13,7 +13,6 @@ func LoadConfig(path string) IConfig {
 		log.Fatalf("Error: .env file not found at path: %s", path)
 	}
 
-	// Read the .env file
 	envMap, err := godotenv.Read(path)
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
