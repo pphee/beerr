@@ -22,6 +22,7 @@ type IUsersUsecase interface {
 	UpdateRole(userId string, roleId int, role string) error
 	CreateRole(roleId, role string) error
 	CreateUserZitadel(ctx context.Context, req *users.UserRegisterReq) (*management.ImportHumanUserResponse, error)
+	ImportUsersFromMongo() ([]users.UserZitadel, error)
 }
 
 type usersUsecase struct {
@@ -279,6 +280,15 @@ func (u *usersUsecase) CreateRole(roleId, role string) error {
 
 func (u *usersUsecase) CreateUserZitadel(ctx context.Context, req *users.UserRegisterReq) (*management.ImportHumanUserResponse, error) {
 	result, err := u.userRepository.CreateUserZitadel(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (u *usersUsecase) ImportUsersFromMongo() ([]users.UserZitadel, error) {
+	result, err := u.userRepository.ImportUsersFromMongo()
 	if err != nil {
 		return nil, err
 	}

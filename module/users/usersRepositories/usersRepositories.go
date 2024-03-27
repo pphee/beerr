@@ -28,6 +28,7 @@ type UserRepository interface {
 	UpdateRole(userId string, roleId int, role string) error
 	CreateRole(roleId, role string) error
 	CreateUserZitadel(ctx context.Context, userRequest *users.UserRegisterReq) (*management.ImportHumanUserResponse, error)
+	ImportUsersFromMongo() ([]users.UserZitadel, error)
 }
 
 type usersRepository struct {
@@ -308,4 +309,35 @@ func (r *usersRepository) CreateUserZitadel(ctx context.Context, userRequest *us
 	}
 
 	return user, nil
+}
+
+func (r *usersRepository) ImportUsersFromMongo() ([]users.UserZitadel, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	usersCollection := r.db.Collection(r.cfg.Db().UsersCollection())
+
+	cur, err := usersCollection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to find users in MongoDB: %w", err)
+	}
+	defer cur.Close(ctx)
+
+	var zitadelUsers []users.UserZitadel
+	for cur.Next(ctx) {
+		var user users.UserZitadel
+		if err := cur.Decode(&user); err != nil {
+			fmt.Println("Failed to decode user from MongoDB:", err)
+			continue
+		}
+
+		zitadelUsers = append(zitadelUsers, user)
+		fmt.Printf("User %s imported successfully to ZITADEL.\n", user.Username)
+	}
+
+	if err := cur.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error: %w", err)
+	}
+
+	return zitadelUsers, nil
 }

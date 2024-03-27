@@ -120,3 +120,49 @@ type RoleCreateRequest struct {
 	RoleID string `json:"role_id"`
 	Role   string `json:"role"`
 }
+
+type UserProfile struct {
+	UserName                        string         `json:"userName"`
+	Profile                         Profile        `json:"profile"`
+	Email                           Email          `json:"email"`
+	Phone                           Phone          `json:"phone"`
+	Password                        string         `json:"password"`
+	HashedPassword                  HashedPassword `json:"hashedPassword"`
+	PasswordChangeRequired          bool           `json:"passwordChangeRequired"`
+	RequestPasswordlessRegistration bool           `json:"requestPasswordlessRegistration"`
+	OtpCode                         string         `json:"otpCode"`
+}
+
+type Profile struct {
+	FirstName         string `json:"firstName"`
+	LastName          string `json:"lastName"`
+	NickName          string `json:"nickName"`
+	DisplayName       string `json:"displayName"`
+	PreferredLanguage string `json:"preferredLanguage"`
+	Gender            string `json:"gender"`
+}
+
+type Email struct {
+	Email           string `json:"email"`
+	IsEmailVerified bool   `json:"isEmailVerified"`
+}
+
+type Phone struct {
+	Phone           string `json:"phone"`
+	IsPhoneVerified bool   `json:"isPhoneVerified"`
+}
+
+type HashedPassword struct {
+	Value string `json:"value"`
+}
+
+type DeleteUserRequest struct {
+	UserID string `json:"userId"`
+	Reason string `json:"reason"`
+}
+
+type UserZitadel struct {
+	Username       string
+	HashedPassword string
+	Email          string
+}

@@ -62,7 +62,15 @@ func (m *moduleFactory) UsersModule() {
 	usersGroup.PATCH("/update-role/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.UpdateRole)
 	usersGroup.GET("/auth-ctx", userHandler.AuthCtx)
 
-	usersGroup.POST("/create-user-zitadel", userHandler.CreateUserZitadel)
+	//usersGroup.POST("/create-user-zitadel", userHandler.CreateUserZitadel)
+	usersGroup.POST("/create-user-zitadel", userHandler.CreateUserProfile)
+	usersGroup.DELETE("/delete-user-zitadel/:id", userHandler.DeleteUserZitadel)
+	usersGroup.GET("/get-user-zitadel/:id", userHandler.GetUserZitadel)
+	usersGroup.POST("/import-users-to-zitadel", userHandler.ImportUserToZitadel)
+	//LockUserInZitadel
+	usersGroup.POST("/lock-user-zitadel/:id", userHandler.LockUserInZitadel)
+	//UnlockUserInZitadel
+	usersGroup.POST("/unlock-user-zitadel/:id", userHandler.UnlockUserInZitadel)
 
 	//zitadel
 	//, m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(1, 2)
