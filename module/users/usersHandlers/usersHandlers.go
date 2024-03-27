@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
+	"github.com/zitadel/zitadel-go/v3/pkg/http/middleware"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"pok92deng/config"
 	"pok92deng/module/users"
@@ -22,17 +25,21 @@ type IUserHandler interface {
 	GetAllUserProfile(c *gin.Context)
 	UpdateRole(c *gin.Context)
 	CreateRole(c *gin.Context)
+	AuthCtx(c *gin.Context)
+	CreateUserZitadel(c *gin.Context)
 }
 
 type usersHandler struct {
 	usersUsecase usersUsecases.IUsersUsecase
 	cfg          config.IConfig
+	mw           *middleware.Interceptor[*oauth.IntrospectionContext]
 }
 
-func UsersHandler(cfg config.IConfig, usersUsecase usersUsecases.IUsersUsecase) IUserHandler {
+func UsersHandler(cfg config.IConfig, usersUsecase usersUsecases.IUsersUsecase, mw *middleware.Interceptor[*oauth.IntrospectionContext]) IUserHandler {
 	return &usersHandler{
 		cfg:          cfg,
 		usersUsecase: usersUsecase,
+		mw:           mw,
 	}
 }
 
@@ -288,5 +295,83 @@ func (h *usersHandler) CreateRole(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Create role successfully",
+	})
+}
+
+func (h *usersHandler) ginMw(handler gin.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h.mw.RequireAuthorization()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.Request = r
+			handler(c)
+		})).ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func (h *usersHandler) AuthCtx(c *gin.Context) {
+	h.ginMw(func(c *gin.Context) {
+		authCtx := h.mw.Context(c.Request.Context())
+		if authCtx == nil {
+			slog.Error("failed to get authorization context", "error", "authCtx is nil")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get authorization context"})
+			return
+		}
+
+		userID := authCtx.UserID()
+		userEmail := authCtx.Email
+
+		slog.Info("user accessed task list", "id", userID, "username", authCtx.Username)
+		slog.Info("user accessed task list", "email", userEmail)
+
+		userCredential := &users.UserCredential{
+			Email: userEmail,
+		}
+
+		fmt.Println("userCredential", userCredential)
+
+		passport, err := h.usersUsecase.GetPassport(userCredential)
+		if err != nil {
+			slog.Error("failed to get user passport", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user passport"})
+			return
+		}
+
+		zitadel := &users.UserPassport{
+			User: &users.User{
+				Id:       passport.User.Id,
+				Email:    passport.User.Email,
+				Username: passport.User.Username,
+				Role:     passport.User.Role,
+				RoleId:   passport.User.RoleId,
+			},
+		}
+
+		c.JSON(http.StatusOK, zitadel)
+
+	})(c)
+}
+
+func (h *usersHandler) CreateUserZitadel(c *gin.Context) {
+	req := new(users.UserRegisterReq)
+	if err := c.ShouldBindJSON(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": err.Error(),
+		})
+		return
+	}
+	ctx := c.Request.Context()
+
+	result, err := h.usersUsecase.CreateUserZitadel(ctx, req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "User created successfully",
+		"data":    result,
 	})
 }

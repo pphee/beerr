@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"pok92deng/config"
 	"pok92deng/module/server"
+	auth "pok92deng/pkg"
 	databases "pok92deng/pkg/database"
 )
 
@@ -19,8 +21,11 @@ func envPath() string {
 }
 
 func main() {
-	cfg := config.LoadConfig(envPath())
+	godotenv.Load("/Users/p/Goland/pok92deng/.env")
+	cfg := config.LoadConfig("/Users/p/Goland/pok92deng/.env")
 	fmt.Println(cfg.Db())
+
+	ctx := context.Background()
 
 	mongoDatabase, err := databases.ConnectMongoDB(cfg.Db())
 	if err != nil {
@@ -36,9 +41,14 @@ func main() {
 		}
 	}()
 
-	ctx := context.Background()
+	zitadel, err := auth.InitZitadelAuthorization(ctx, cfg.Zitadel())
+	if err != nil {
+		log.Fatalf("Failed to initialize ZITADEL: %v", err)
+	}
 
-	server := servers.NewServer(cfg, mongoDatabase)
+	connectZitadel, err := databases.ConnectZitadel(ctx, cfg.Zitadel())
+
+	server := servers.NewServer(cfg, mongoDatabase, zitadel, connectZitadel)
 	if err := server.Start(ctx); err != nil { // Pass the created context
 		log.Fatalf("Failed to start server: %v", err)
 	}

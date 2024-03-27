@@ -12,7 +12,7 @@ type User struct {
 	Email    string             `bson:"email" json:"email"`
 	Username string             `bson:"username" json:"username"`
 	Role     string             `bson:"role" json:"role"`
-	RoleId   int                `bson:"role_id" json:"role_id"` // Ensure this is an integer.
+	RoleId   int                `bson:"role_id" json:"role_id"`
 }
 
 type UserPassport struct {

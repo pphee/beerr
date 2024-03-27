@@ -1,7 +1,9 @@
 package usersUsecases
 
 import (
+	"context"
 	"fmt"
+	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/management"
 	"golang.org/x/crypto/bcrypt"
 	"pok92deng/config"
 	"pok92deng/module/users"
@@ -19,6 +21,7 @@ type IUsersUsecase interface {
 	GetAllUserProfile() ([]*users.User, error)
 	UpdateRole(userId string, roleId int, role string) error
 	CreateRole(roleId, role string) error
+	CreateUserZitadel(ctx context.Context, req *users.UserRegisterReq) (*management.ImportHumanUserResponse, error)
 }
 
 type usersUsecase struct {
@@ -272,4 +275,13 @@ func (u *usersUsecase) CreateRole(roleId, role string) error {
 		return err
 	}
 	return nil
+}
+
+func (u *usersUsecase) CreateUserZitadel(ctx context.Context, req *users.UserRegisterReq) (*management.ImportHumanUserResponse, error) {
+	result, err := u.userRepository.CreateUserZitadel(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

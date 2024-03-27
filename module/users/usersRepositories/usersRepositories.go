@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/zitadel/zitadel-go/v3/pkg/client"
+	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/management"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,17 +27,20 @@ type UserRepository interface {
 	GetAllUserProfile() ([]*users.User, error)
 	UpdateRole(userId string, roleId int, role string) error
 	CreateRole(roleId, role string) error
+	CreateUserZitadel(ctx context.Context, userRequest *users.UserRegisterReq) (*management.ImportHumanUserResponse, error)
 }
 
 type usersRepository struct {
-	db  *mongo.Database
-	cfg config.IConfig
+	db             *mongo.Database
+	cfg            config.IConfig
+	connectZitadel *client.Client
 }
 
-func UsersRepository(cfg config.IConfig, mongoDatabase *mongo.Database) UserRepository {
+func UsersRepository(cfg config.IConfig, mongoDatabase *mongo.Database, connectZitadel *client.Client) UserRepository {
 	return &usersRepository{
-		cfg: cfg,
-		db:  mongoDatabase,
+		cfg:            cfg,
+		db:             mongoDatabase,
+		connectZitadel: connectZitadel,
 	}
 }
 
@@ -288,4 +293,19 @@ func (r *usersRepository) CreateRole(roleId, role string) error {
 	fmt.Println("result", result)
 
 	return nil
+}
+
+func (r *usersRepository) CreateUserZitadel(ctx context.Context, userRequest *users.UserRegisterReq) (*management.ImportHumanUserResponse, error) {
+	// Assuming UserService() returns a service client that has an AddHumanUser method
+	userServiceClient := r.connectZitadel.ManagementService()
+	user, err := userServiceClient.ImportHumanUser(ctx, &management.ImportHumanUserRequest{
+		UserName: userRequest.Username,
+		Password: userRequest.Password,
+	})
+	if err != nil {
+		fmt.Println("Error:", err)
+		return nil, err
+	}
+
+	return user, nil
 }

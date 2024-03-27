@@ -2,6 +2,8 @@ package servers
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
+	"github.com/zitadel/zitadel-go/v3/pkg/http/middleware"
 	"pok92deng/module/middleware"
 	"pok92deng/module/middleware/middlewareHandlers"
 	"pok92deng/module/middleware/middlewareRepositories"
@@ -23,26 +25,30 @@ type moduleFactory struct {
 	r   *gin.RouterGroup
 	s   *server
 	mid middlewaresHandler.IMiddlewaresHandler
+	mw  *middleware.Interceptor[*oauth.IntrospectionContext]
 }
 
-func InitModule(r *gin.RouterGroup, s *server, mid middlewaresHandler.IMiddlewaresHandler) IModuleFactory {
+func InitModule(r *gin.RouterGroup, s *server, mid middlewaresHandler.IMiddlewaresHandler, mw *middleware.Interceptor[*oauth.IntrospectionContext]) IModuleFactory {
 	return &moduleFactory{
 		r:   r,
 		s:   s,
 		mid: mid,
+		mw:  mw,
 	}
 }
 
 func InitMiddlewares(s *server) middlewaresHandler.IMiddlewaresHandler {
 	middlewareRepository := middlewaresRepositories.MiddlewaresRepository(s.cfg, s.mongoDatabase)
 	middlewareUseCase := middlewaresUsecases.MiddlewareUsecases(middlewareRepository)
-	return middlewaresHandler.MiddlewaresHandler(s.cfg, middlewareUseCase)
+	return middlewaresHandler.MiddlewaresHandler(s.cfg, middlewareUseCase, usersUsecases.UsersUsecase(s.cfg, usersRepositories.UsersRepository(s.cfg, s.mongoDatabase, s.connectZitadel)))
 }
 
 func (m *moduleFactory) UsersModule() {
-	userRepo := usersRepositories.UsersRepository(m.s.cfg, m.s.mongoDatabase)
+
+	userRepo := usersRepositories.UsersRepository(m.s.cfg, m.s.mongoDatabase, m.s.connectZitadel)
 	userUseCase := usersUsecases.UsersUsecase(m.s.cfg, userRepo)
-	userHandler := usersHandlers.UsersHandler(m.s.cfg, userUseCase)
+	userHandler := usersHandlers.UsersHandler(m.s.cfg, userUseCase, m.mw)
+
 	usersGroup := m.r.Group("/users")
 	usersGroup.POST("/signup", userHandler.SignUpCustomer)
 	usersGroup.POST("/sign-in", userHandler.SignIn)
@@ -51,11 +57,15 @@ func (m *moduleFactory) UsersModule() {
 	usersGroup.POST("/signup-admin", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	usersGroup.POST("/signup-admin-no-middleware", userHandler.SignUpAdmin)
 	usersGroup.POST("/create-role", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.CreateRole)
-
 	usersGroup.GET("/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.ParamCheck(), userHandler.GerUserProfile)
 	usersGroup.GET("/get-all-user", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GetAllUserProfile)
 	usersGroup.PATCH("/update-role/:user_id", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.UpdateRole)
+	usersGroup.GET("/auth-ctx", userHandler.AuthCtx)
 
+	usersGroup.POST("/create-user-zitadel", userHandler.CreateUserZitadel)
+
+	//zitadel
+	//, m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: true, AllowAdmin: true}), m.mid.Authorize(1, 2)
 	//usersGroup.POST("/signup-admin", m.mid.JwtAuth(), m.mid.Authorize(2), userHandler.SignUpAdmin)
 	//usersGroup.GET("/admin/secret", m.mid.JwtAuth(middlewares.JwtAuthConfig{AllowCustomer: false, AllowAdmin: true}), m.mid.Authorize(2), userHandler.GenerateAdminToken)
 }

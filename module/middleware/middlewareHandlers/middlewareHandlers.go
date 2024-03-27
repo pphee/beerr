@@ -1,12 +1,20 @@
 package middlewaresHandler
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
+	"github.com/zitadel/zitadel-go/v3/pkg/http/middleware"
+	"github.com/zitadel/zitadel-go/v3/pkg/zitadel"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"pok92deng/config"
 	"pok92deng/module/middleware"
 	"pok92deng/module/middleware/middlewareUsecases"
+	"pok92deng/module/users"
+	"pok92deng/module/users/usersUsecases"
 	auth "pok92deng/pkg"
 	"pok92deng/pkg/utils"
 	"strconv"
@@ -23,12 +31,14 @@ type IMiddlewaresHandler interface {
 type middlewaresHandler struct {
 	cfg                config.IConfig
 	middlewaresUsecase middlewaresUsecases.IMiddlewaresUsecase
+	usersUsecase       usersUsecases.IUsersUsecase
 }
 
-func MiddlewaresHandler(cfg config.IConfig, middlewaresUsecase middlewaresUsecases.IMiddlewaresUsecase) IMiddlewaresHandler {
+func MiddlewaresHandler(cfg config.IConfig, middlewaresUsecase middlewaresUsecases.IMiddlewaresUsecase, usersUsecase usersUsecases.IUsersUsecase) IMiddlewaresHandler {
 	return &middlewaresHandler{
 		cfg:                cfg,
 		middlewaresUsecase: middlewaresUsecase,
+		usersUsecase:       usersUsecase,
 	}
 }
 
@@ -63,6 +73,7 @@ func (h *middlewaresHandler) ParamCheck() gin.HandlerFunc {
 func (h *middlewaresHandler) Authorize(expectRoleId ...int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRoleId, exists := c.Get("userRoleId")
+		fmt.Println("userRoleId", userRoleId, "exists", exists)
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "userRoleId not found"})
 			return
@@ -136,52 +147,116 @@ func sumRoles(roles ...int) int {
 
 func (h *middlewaresHandler) JwtAuth(config middlewares.JwtAuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-
-		var userID string
-		var userRoleId int
-		var isCustomer bool
-
-		if config.AllowCustomer {
-			parsedToken, err := auth.ParseCustomerToken(h.cfg.Jwt(), tokenString)
-			if err == nil {
-				claims := parsedToken.Claims
-				userID = claims.Id.Hex()
-				userRoleId = claims.RoleId
-				isCustomer = true
-				c.Set("userId", userID)
-				c.Set("userRoleId", userRoleId)
-
-				if !h.middlewaresUsecase.FindAccessToken(userID, tokenString) {
-					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-						"error": "no permission to access",
-					})
-					return
-				}
-			}
+		loginType := c.Request.Header.Get("loginType")
+		fmt.Println("loginType", loginType)
+		switch loginType {
+		case "normal":
+			h.processToken(c, config)
+		case "zitadel":
+			h.processZitadelToken(c)
+		default:
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "loginType not found"})
 		}
+	}
+}
 
-		if !isCustomer && config.AllowAdmin {
-			adminClaims, err := auth.ParseAdminToken(h.cfg.Jwt(), tokenString)
-			if err != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"error": "admin token verification failed",
-				})
+func (h *middlewaresHandler) processZitadelToken(c *gin.Context) {
+	ctx := context.Background()
+	authZ, err := authorization.New(ctx, zitadel.New(h.cfg.Zitadel().Domain()), oauth.DefaultAuthorization(h.cfg.Zitadel().Key()))
+	if err != nil {
+		slog.Error("zitadel sdk could not initialize", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Zitadel SDK initialization failed"})
+		return
+	}
+	mw := middleware.New(authZ)
+
+	var userEmail string
+	var userID string
+
+	adaptedMiddleware := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println(r.Context())
+			authCtx := mw.Context(r.Context())
+			if authCtx == nil {
+				slog.Error("failed to get authorization context", "error", "authCtx is nil")
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get authorization context"})
 				return
 			}
-			userID = adminClaims.Claims.Id.Hex()
-			userRoleId = adminClaims.Claims.RoleId
+
+			userID = authCtx.UserID()
+			userEmail = authCtx.Email
+
+			slog.Info("user accessed task list", "id", userID, "username", authCtx.Username)
+			slog.Info("user accessed task list", "email", userEmail)
+		})
+
+		mw.RequireAuthorization()(handler).ServeHTTP(c.Writer, c.Request)
+	}
+
+	adaptedMiddleware(c)
+
+	userCredential := &users.UserCredential{
+		Email: userEmail,
+	}
+
+	fmt.Println("userCredential", userCredential)
+
+	passport, err := h.usersUsecase.GetPassport(userCredential)
+	if err != nil {
+		slog.Error("failed to get user passport", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user passport"})
+		return
+	}
+
+	roleId := passport.User.RoleId
+	c.Set("userId", passport.User.Id)
+	c.Set("userRoleId", roleId)
+
+	c.Next()
+}
+
+func (h *middlewaresHandler) processToken(c *gin.Context, config middlewares.JwtAuthConfig) {
+	tokenString := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+
+	var userID string
+	var userRoleId int
+	var isCustomer bool
+
+	if config.AllowCustomer {
+		parsedToken, err := auth.ParseCustomerToken(h.cfg.Jwt(), tokenString)
+		if err == nil {
+			claims := parsedToken.Claims
+			fmt.Println("claims", claims)
+			userID = claims.Id.Hex()
+			userRoleId = claims.RoleId
+			isCustomer = true
 			c.Set("userId", userID)
 			c.Set("userRoleId", userRoleId)
-		} else if !isCustomer {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "token verification failed",
-			})
+
+			if !h.middlewaresUsecase.FindAccessToken(userID, tokenString) {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "no permission to access"})
+				return
+			}
+		}
+	}
+
+	if !isCustomer && config.AllowAdmin {
+		adminClaims, err := auth.ParseAdminToken(h.cfg.Jwt(), tokenString)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "admin token verification failed"})
 			return
 		}
-
-		c.Next()
+		fmt.Println("adminClaims", adminClaims.Claims)
+		userID = adminClaims.Claims.Id.Hex()
+		userRoleId = adminClaims.Claims.RoleId
+		c.Set("userId", userID)
+		c.Set("userRoleId", userRoleId)
+	} else if !isCustomer {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token verification failed"})
+		return
 	}
+
+	c.Next()
 }
 
 func (h *middlewaresHandler) AuthorizeString(expectRoleNames ...middlewares.UsersRole) gin.HandlerFunc {

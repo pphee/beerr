@@ -47,6 +47,10 @@ func LoadConfig(path string) IConfig {
 			accessExpiresAt:  parseInt("JWT_ACCESS_EXPIRES"),
 			refreshExpiresAt: parseInt("JWT_REFRESH_EXPIRES"),
 		},
+		zitadel: &zitadel{
+			domain: envMap["ZITADEL_DOMAIN"],
+			key:    envMap["ZITADEL_KEY"],
+		},
 	}
 }
 
@@ -54,12 +58,14 @@ type IConfig interface {
 	App() IAppConfig
 	Db() IDbConfig
 	Jwt() IJwtConfig
+	Zitadel() IZitadelConfig
 }
 
 type config struct {
-	app *app
-	db  *db
-	jwt *jwt
+	app     *app
+	db      *db
+	jwt     *jwt
+	zitadel *zitadel
 }
 
 type app struct {
@@ -155,3 +161,25 @@ func (j *jwt) SecretKey() string     { return j.secretKey }
 func (j *jwt) ApiKey() string        { return j.apiKey }
 func (j *jwt) AccessExpiresAt() int  { return j.accessExpiresAt }
 func (j *jwt) RefreshExpiresAt() int { return j.refreshExpiresAt }
+
+type IZitadelConfig interface {
+	Domain() string
+	Key() string
+}
+
+type zitadel struct {
+	domain string
+	key    string
+}
+
+func (z *zitadel) Domain() string {
+	return z.domain
+}
+
+func (z *zitadel) Key() string {
+	return z.key
+}
+
+func (c *config) Zitadel() IZitadelConfig {
+	return c.zitadel
+}
