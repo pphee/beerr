@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
 	"github.com/zitadel/zitadel-go/v3/pkg/http/middleware"
 	"golang.org/x/exp/slog"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -37,6 +38,7 @@ type IUserHandler interface {
 	ImportUserToZitadel(c *gin.Context)
 	LockUserInZitadel(c *gin.Context)
 	UnlockUserInZitadel(c *gin.Context)
+	GetMetadata(c *gin.Context)
 }
 
 type usersHandler struct {
@@ -363,7 +365,12 @@ func fetchUserProfile(userID string) interface{} {
 		fmt.Println(err)
 		return gin.H{"error": "Failed to execute request"}
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(res.Body)
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -377,7 +384,7 @@ func fetchUserProfile(userID string) interface{} {
 }
 
 func (h *usersHandler) GetUserZitadel(c *gin.Context) {
-	userID := c.Param("id")
+	userID := c.Param("zitadel_id")
 
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
@@ -421,71 +428,8 @@ func (h *usersHandler) GetUserZitadel(c *gin.Context) {
 	})
 }
 
-func (h *usersHandler) CreateUserProfile(c *gin.Context) {
-	var userProfile users.UserProfile
-	if err := c.ShouldBindJSON(&userProfile); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	url := "https://auth.cloudsoft.co.th/management/v1/users/human/_import"
-	method := "POST"
-
-	payloadBytes, err := json.Marshal(userProfile)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error marshalling JSON"})
-		return
-	}
-	payload := bytes.NewReader(payloadBytes)
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, payload)
-	if err != nil {
-		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request"})
-		return
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", "Bearer klSUdCOoVNgrjIHGmGh7H0psoAvdMUSyEXdqqqJ5EA9lyIq79LHh7YFkDEjqo4o00uqBbrk") // Use the actual token
-
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute request"})
-		return
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
-		return
-	}
-
-	var responseBody map[string]interface{}
-	if err := json.Unmarshal(body, &responseBody); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error parsing response JSON"})
-		return
-	}
-
-	if code, exists := responseBody["code"].(float64); exists && code == 6 {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":   responseBody["message"],
-			"details": responseBody["details"],
-		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"response": responseBody,
-			"message":  "User profile created successfully",
-		})
-	}
-}
-
 func (h *usersHandler) DeleteUserZitadel(c *gin.Context) {
-	userID := c.Param("id")
+	userID := c.Param("zitadel_id")
 
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
@@ -596,7 +540,7 @@ func (h *usersHandler) importUserToZitadel(c *gin.Context, user users.UserZitade
 }
 
 func (h *usersHandler) LockUserInZitadel(c *gin.Context) {
-	userID := c.Param("id")
+	userID := c.Param("zitadel_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
 		return
@@ -654,7 +598,7 @@ func (h *usersHandler) LockUserInZitadel(c *gin.Context) {
 }
 
 func (h *usersHandler) UnlockUserInZitadel(c *gin.Context) {
-	userID := c.Param("id")
+	userID := c.Param("zitadel_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
 		return
@@ -707,6 +651,142 @@ func (h *usersHandler) UnlockUserInZitadel(c *gin.Context) {
 			"message":  "User unlocked successfully",
 		})
 	}
+}
+
+func (h *usersHandler) CreateUserProfile(c *gin.Context) {
+	var userProfile users.UserProfile
+	if err := c.ShouldBindJSON(&userProfile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	url := "https://auth.cloudsoft.co.th/management/v1/users/human/_import"
+	method := "POST"
+
+	payloadBytes, err := json.Marshal(userProfile)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error marshalling JSON"})
+		return
+	}
+	payload := bytes.NewReader(payloadBytes)
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request"})
+		return
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer klSUdCOoVNgrjIHGmGh7H0psoAvdMUSyEXdqqqJ5EA9lyIq79LHh7YFkDEjqo4o00uqBbrk")
+
+	res, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute request"})
+		return
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+		return
+	}
+
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(body, &responseBody); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error parsing response JSON"})
+		return
+	}
+
+	if code, exists := responseBody["code"].(float64); exists && code == 6 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   responseBody["message"],
+			"details": responseBody["details"],
+		})
+		return
+	}
+
+	if userID, ok := responseBody["userId"].(string); ok {
+		h.SetMetadata(c, userID, "Organization_id", userProfile.OrganizationId)
+		c.JSON(http.StatusOK, gin.H{
+			"response": responseBody,
+			"message":  "User profile created successfully",
+		})
+	} else {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "User ID not found in response",
+		})
+	}
+}
+
+func (h *usersHandler) SetMetadata(c *gin.Context, userID, metaKey, metaValue string) {
+	url := fmt.Sprintf("https://auth.cloudsoft.co.th/management/v1/users/%s/metadata/%s", userID, metaKey)
+	method := "POST"
+
+	payload := strings.NewReader(fmt.Sprintf(`{
+        "value": "%s"
+    }`, metaValue))
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer klSUdCOoVNgrjIHGmGh7H0psoAvdMUSyEXdqqqJ5EA9lyIq79LHh7YFkDEjqo4o00uqBbrk")
+
+	res, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusOK {
+		fmt.Println(metaKey + " update success")
+	} else {
+		body, _ := ioutil.ReadAll(res.Body)
+		fmt.Println(string(body))
+	}
+}
+
+func (h *usersHandler) GetMetadata(c *gin.Context) {
+	userID := c.Param("zitadel_id")
+	metaKey := c.Param("key")
+	customDomain := "auth.cloudsoft.co.th"
+	url := fmt.Sprintf("https://%s/management/v1/users/%s/metadata/%s", customDomain, userID, metaKey)
+	method := "GET"
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request"})
+		return
+	}
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer klSUdCOoVNgrjIHGmGh7H0psoAvdMUSyEXdqqqJ5EA9lyIq79LHh7YFkDEjqo4o00uqBbrk") // Replace with your actual token
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute request"})
+		return
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+		return
+	}
+
+	c.Data(http.StatusOK, "application/json", body)
 }
 
 func (h *usersHandler) CreateUserZitadel(c *gin.Context) {

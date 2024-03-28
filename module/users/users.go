@@ -131,6 +131,7 @@ type UserProfile struct {
 	PasswordChangeRequired          bool           `json:"passwordChangeRequired"`
 	RequestPasswordlessRegistration bool           `json:"requestPasswordlessRegistration"`
 	OtpCode                         string         `json:"otpCode"`
+	OrganizationId                  string         `json:"organizationId"`
 }
 
 type Profile struct {
